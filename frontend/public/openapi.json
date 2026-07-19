@@ -2033,7 +2033,7 @@
         "type": "object"
       },
       "Node": {
-        "description": "Node represents a remote Nova Panel registered with the central panel.\nThe central panel polls each node's existing /panel/api/server/status\nendpoint over HTTP using the per-node ApiToken to populate the runtime\nstatus fields below.",
+        "description": "Node represents a remote Nova Panel instance registered with the central panel.\nThe central panel polls each node's existing /panel/api/server/status\nendpoint over HTTP using the per-node ApiToken to populate the runtime\nstatus fields below.",
         "properties": {
           "activeCount": {
             "example": 23,
@@ -2474,7 +2474,7 @@
         "type": "object"
       },
       "Setting": {
-        "description": "Setting stores key-value configuration settings for the Nova Panel.",
+        "description": "Setting stores key-value configuration settings for Nova Panel.",
         "properties": {
           "id": {
             "type": "integer"
@@ -2494,7 +2494,7 @@
         "type": "object"
       },
       "User": {
-        "description": "User represents a user account in the Nova Panel.",
+        "description": "User represents a user account in Nova Panel.",
         "properties": {
           "id": {
             "type": "integer"
