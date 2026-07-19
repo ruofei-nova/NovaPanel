@@ -40,7 +40,7 @@ type PanelUpdateInfo struct {
 }
 
 const (
-	panelRepository      = "liurenyi-ai/3x-ui"
+	panelRepository      = "liurenyi-ai/NovaPanel"
 	panelUpdaterURL      = "https://raw.githubusercontent.com/" + panelRepository + "/main/update.sh"
 	maxPanelUpdaterBytes = 2 << 20
 	// devReleaseTag is the fixed-tag rolling pre-release the CI force-moves to the
