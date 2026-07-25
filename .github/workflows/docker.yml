@@ -6,12 +6,22 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: Verify an existing GHCR image without rebuilding it
+        type: boolean
+        default: false
+      image_tag:
+        description: Existing image tag to verify (required when verify_only is enabled)
+        type: string
+        required: false
   push:
     tags:
       - "v*.*.*"
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.verify_only }}
     runs-on: ubuntu-latest
 
     steps:
@@ -55,12 +65,24 @@ jobs:
   verify-manifest:
     name: Verify published manifest
     needs: build
+    if: >-
+      ${{
+        always() &&
+        (
+          needs.build.result == 'success' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.verify_only &&
+            inputs.image_tag != ''
+          )
+        )
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
     env:
-      IMAGE: ghcr.io/ruofei-nova/novapanel:${{ github.ref_name }}
+      IMAGE: ghcr.io/ruofei-nova/novapanel:${{ inputs.image_tag || github.ref_name }}
     steps:
       - uses: docker/setup-buildx-action@v4
       - name: Login to GHCR
@@ -81,14 +103,26 @@ jobs:
             linux/386 \
             linux/amd64 \
             linux/arm/v6 \
-            linux/arm/v7 \
-            linux/arm64/v8; do
+            linux/arm/v7; do
             grep -Fx "$platform" platforms.txt
           done
+          grep -Eq '^linux/arm64(/v8)?$' platforms.txt
 
   runtime-smoke:
     name: Runtime smoke (${{ matrix.platform }})
     needs: build
+    if: >-
+      ${{
+        always() &&
+        (
+          needs.build.result == 'success' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.verify_only &&
+            inputs.image_tag != ''
+          )
+        )
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -118,7 +152,7 @@ jobs:
             xray: 386
             mtg: 386
     env:
-      IMAGE: ghcr.io/ruofei-nova/novapanel:${{ github.ref_name }}
+      IMAGE: ghcr.io/ruofei-nova/novapanel:${{ inputs.image_tag || github.ref_name }}
     steps:
       - uses: docker/setup-qemu-action@v4
       - name: Login to GHCR
