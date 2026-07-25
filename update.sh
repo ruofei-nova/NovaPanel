@@ -967,6 +967,50 @@ _install_xui_service_unit() {
     return 0
 }
 
+_verify_release_checksum() {
+    local tag="$1"
+    local archive="$2"
+    local archive_name
+    local sums_file
+    local expected
+    local actual
+    archive_name=$(basename "$archive")
+    sums_file="${archive}.SHA256SUMS.$$"
+
+    rm -f "$sums_file"
+    if ! ${curl_bin} -fsSL -o "$sums_file" \
+        "https://github.com/ruofei-nova/NovaPanel/releases/download/${tag}/SHA256SUMS"; then
+        rm -f "$sums_file"
+        if [[ "$tag" != "dev-latest" ]] && \
+            [[ "$(printf '%s\n' "3.5.3" "${tag#v}" | sort -V | head -n1)" != "3.5.3" ]]; then
+            echo -e "${yellow}Warning: ${tag} predates published SHA-256 manifests; continuing for backward compatibility.${plain}"
+            return 0
+        fi
+        echo -e "${red}Failed to download SHA256SUMS for ${tag}; refusing an unverified release archive.${plain}"
+        return 1
+    fi
+
+    expected=$(awk -v file="$archive_name" '$2 == file || $2 == "*" file { print $1; exit }' "$sums_file")
+    rm -f "$sums_file"
+    if [[ ! "$expected" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        echo -e "${red}SHA256SUMS does not contain a valid digest for ${archive_name}.${plain}"
+        return 1
+    fi
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$archive" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+    else
+        actual=$(openssl dgst -sha256 "$archive" | awk '{print $NF}')
+    fi
+    if [[ "${actual,,}" != "${expected,,}" ]]; then
+        echo -e "${red}SHA-256 verification failed for ${archive_name}; the file will not be installed.${plain}"
+        return 1
+    fi
+    echo -e "${green}SHA-256 verification passed for ${archive_name}.${plain}"
+}
+
 update_x-ui() {
     cd ${xui_folder%/x-ui}/
 
@@ -1000,6 +1044,10 @@ update_x-ui() {
     if [[ ! -s ${xui_folder}-linux-$(arch).tar.gz ]]; then
         rm ${xui_folder}-linux-$(arch).tar.gz -f > /dev/null 2>&1
         _fail "ERROR: Downloaded x-ui release archive is empty, please be sure that your server can access GitHub"
+    fi
+    if ! _verify_release_checksum "$tag_version" "${xui_folder}-linux-$(arch).tar.gz"; then
+        rm ${xui_folder}-linux-$(arch).tar.gz -f > /dev/null 2>&1
+        _fail "ERROR: Release checksum verification failed"
     fi
 
     if [[ -e ${xui_folder}/ ]]; then

@@ -72,10 +72,10 @@
 bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh)
 ```
 
-Чтобы установить конкретную версию, добавьте её тег (например, `v3.4.0`):
+Чтобы установить конкретную версию, добавьте её тег (например, `v3.5.3`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 Чтобы установить скользящую **dev**-сборку (новейший предварительный релиз по каждому коммиту из ветки `main`, а не стабильный релиз), передайте `dev-latest`:

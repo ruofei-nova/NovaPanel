@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -851,32 +852,54 @@ func (s *ServerService) RestartXrayService() error {
 	return nil
 }
 
+func currentBuildSetting(key string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, setting := range info.Settings {
+		if setting.Key == key {
+			return setting.Value
+		}
+	}
+	return ""
+}
+
+func xrayReleaseArch(goarch, goarm string) string {
+	switch goarch {
+	case "amd64":
+		return "64"
+	case "arm64":
+		return "arm64-v8a"
+	case "arm":
+		switch strings.TrimPrefix(strings.ToLower(goarm), "v") {
+		case "5":
+			return "arm32-v5"
+		case "6":
+			return "arm32-v6"
+		default:
+			// GOARM is normally embedded in the Go build settings. If a
+			// stripped or unusual build omits it, v7 is the modern Go default.
+			return "arm32-v7a"
+		}
+	case "386":
+		return "32"
+	case "s390x":
+		return "s390x"
+	default:
+		return goarch
+	}
+}
+
 func (s *ServerService) downloadXRay(version string) (string, error) {
 	osName := runtime.GOOS
-	arch := runtime.GOARCH
+	arch := xrayReleaseArch(runtime.GOARCH, currentBuildSetting("GOARM"))
 
 	switch osName {
 	case "darwin":
 		osName = "macos"
 	case "windows":
 		osName = "windows"
-	}
-
-	switch arch {
-	case "amd64":
-		arch = "64"
-	case "arm64":
-		arch = "arm64-v8a"
-	case "armv7":
-		arch = "arm32-v7a"
-	case "armv6":
-		arch = "arm32-v6"
-	case "armv5":
-		arch = "arm32-v5"
-	case "386":
-		arch = "32"
-	case "s390x":
-		arch = "s390x"
 	}
 
 	fileName := fmt.Sprintf("Xray-%s-%s.zip", osName, arch)

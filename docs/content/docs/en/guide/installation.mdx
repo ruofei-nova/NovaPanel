@@ -29,7 +29,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/ins
 Install a **specific version** by appending its tag:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 Install the rolling **dev** build (the latest per-commit pre-release from `main`
@@ -65,6 +65,13 @@ Prefer the prebuilt image? It's published to the GitHub Container Registry. The
 image bundles Fail2ban (for [IP limits](/docs/operations/security)), which bans
 with `iptables` and therefore needs `NET_ADMIN` (and `NET_RAW` for IPv6) —
 otherwise bans are logged but never applied:
+
+The GHCR image is intentionally private. Log in with a GitHub token that has
+`read:packages` before pulling it:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
 
 ```bash title="docker run"
 docker run -d \

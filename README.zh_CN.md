@@ -72,10 +72,10 @@
 bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh)
 ```
 
-若要安装特定版本，请在命令后附加对应的标签（例如 `v3.4.0`）：
+若要安装特定版本，请在命令后附加对应的标签（例如 `v3.5.3`）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 若要安装滚动更新的 **dev** 版本（来自 `main` 的最新逐次提交预发布版本，而非稳定版本），请传入 `dev-latest`：
@@ -137,6 +137,13 @@ docker compose --profile postgres up -d
 ```
 
 该镜像捆绑了 Fail2ban（默认启用），用于强制执行按客户端的 **IP 限制**。Fail2ban 使用 `iptables` 封禁违规者，这需要 `NET_ADMIN` 权限。`docker-compose.yml` 已通过 `cap_add` 授予该权限；如果您改用 `docker run` 启动容器，请自行添加这些权限，否则封禁只会被记录而永远不会生效：
+
+GHCR 镜像会保持私有。拉取前，请使用具有 `read:packages` 权限的 GitHub
+令牌登录（不要把令牌直接写进命令历史）：
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u 您的GitHub用户名 --password-stdin
+```
 
 ```bash
 docker run -d --cap-add=NET_ADMIN --cap-add=NET_RAW ... ghcr.io/ruofei-nova/novapanel

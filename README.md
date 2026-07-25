@@ -72,10 +72,10 @@ Built as an enhanced fork of the original X-UI project, 3X-UI adds broader proto
 bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh)
 ```
 
-To install a specific version, append its tag (e.g. `v3.4.0`):
+To install a specific version, append its tag (e.g. `v3.5.3`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 To install the rolling **dev** build (latest per-commit pre-release from `main`, not a stable release), pass `dev-latest`:
@@ -137,6 +137,13 @@ docker compose --profile postgres up -d
 ```
 
 The image bundles Fail2ban (enabled by default) to enforce per-client **IP limits**. Fail2ban bans offenders with `iptables`, which requires the `NET_ADMIN` capability. `docker-compose.yml` already grants it via `cap_add`; if you start the container with `docker run` instead, add the capabilities yourself, otherwise bans are logged but never applied:
+
+The GHCR image is intentionally private. Authenticate with a GitHub token that
+has `read:packages` before pulling it:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
 
 ```bash
 docker run -d --cap-add=NET_ADMIN --cap-add=NET_RAW ... ghcr.io/ruofei-nova/novapanel

@@ -1,18 +1,10 @@
 name: Docs Deploy (GitHub Pages)
 
-# Static-export deploy of docs/ to GitHub Pages. Pages must be enabled in repo
-# settings (Source: GitHub Actions) and the docs.sanaei.dev custom domain
-# attached to this repository. The site URL defaults to the production domain in
-# docs/lib/shared.ts, so NEXT_PUBLIC_SITE_URL is optional.
+# Optional static export of docs/. NovaPanel intentionally does not publish
+# documentation automatically: this private-use fork has no custom docs domain,
+# and automatic Pages deployment would make another public surface. Enable
+# Pages and run this workflow manually only after choosing a public site URL.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - 'frontend/src/components/**'
-      - 'frontend/.storybook/**'
-      - 'frontend/package-lock.json'
-      - '.github/workflows/docs-deploy.yml'
   workflow_dispatch:
 
 permissions:

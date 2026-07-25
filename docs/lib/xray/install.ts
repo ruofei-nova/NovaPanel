@@ -22,7 +22,7 @@ function isLatest(version: string): boolean {
 /**
  * The one-line script install command. The master install script reads the
  * version as its first argument: empty = latest stable release, a tag like
- * `v3.4.0` = that release, and `dev-latest` = the rolling per-commit dev build.
+ * `v3.5.3` = that release, and `dev-latest` = the rolling per-commit dev build.
  */
 export function buildScriptCommand(options: InstallOptions): string {
   if (isLatest(options.version)) {

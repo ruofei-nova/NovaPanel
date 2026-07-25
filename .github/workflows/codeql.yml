@@ -11,12 +11,26 @@ on:
       - "go.mod"
       - "go.sum"
       - "frontend/**"
+      - "internal/config/version"
+      - "Dockerfile"
+      - "DockerInit.sh"
+      - "DockerEntrypoint.sh"
+      - "docker-compose.yml"
+      - "**.sh"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "**.go"
       - "go.mod"
       - "go.sum"
       - "frontend/**"
+      - "internal/config/version"
+      - "Dockerfile"
+      - "DockerInit.sh"
+      - "DockerEntrypoint.sh"
+      - "docker-compose.yml"
+      - "**.sh"
+      - ".github/workflows/**"
   schedule:
     - cron: "18 2 * * 2"
 

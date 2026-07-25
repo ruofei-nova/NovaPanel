@@ -72,10 +72,10 @@ Construido como un fork mejorado del proyecto X-UI original, 3X-UI añade un sop
 bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh)
 ```
 
-Para instalar una versión específica, añade su etiqueta (p. ej. `v3.4.0`):
+Para instalar una versión específica, añade su etiqueta (p. ej. `v3.5.3`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 Para instalar la versión **dev** continua (la última prelanzamiento por commit desde `main`, no una versión estable), pasa `dev-latest`:

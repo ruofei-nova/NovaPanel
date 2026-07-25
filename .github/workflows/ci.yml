@@ -8,6 +8,16 @@ on:
       - "go.sum"
       - "frontend/**"
       - ".nvmrc"
+      - "internal/config/version"
+      - "Dockerfile"
+      - "DockerInit.sh"
+      - "DockerEntrypoint.sh"
+      - "docker-compose.yml"
+      - "install.sh"
+      - "update.sh"
+      - "x-ui.sh"
+      - "x-ui.service.*"
+      - ".github/workflows/**"
   push:
     branches:
       - main
@@ -17,6 +27,16 @@ on:
       - "go.sum"
       - "frontend/**"
       - ".nvmrc"
+      - "internal/config/version"
+      - "Dockerfile"
+      - "DockerInit.sh"
+      - "DockerEntrypoint.sh"
+      - "docker-compose.yml"
+      - "install.sh"
+      - "update.sh"
+      - "x-ui.sh"
+      - "x-ui.service.*"
+      - ".github/workflows/**"
 
 permissions:
   contents: read

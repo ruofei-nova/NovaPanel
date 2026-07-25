@@ -11,6 +11,7 @@ on:
       - "**.go"
       - "go.mod"
       - "go.sum"
+      - "internal/config/version"
       - "**.sh"
       - "frontend/**"
       - "x-ui.service.debian"
@@ -22,6 +23,7 @@ on:
       - "**.go"
       - "go.mod"
       - "go.sum"
+      - "internal/config/version"
       - "**.sh"
       - "frontend/**"
       - "x-ui.service.debian"
@@ -30,9 +32,40 @@ on:
       - ".github/workflows/release.yml"
 
 jobs:
-  build:
+  release-preflight:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify version and tag agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < internal/config/version)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "internal/config/version is not a semantic version: $version" >&2
+            exit 1
+          }
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            expected="v${version}"
+            [[ "$GITHUB_REF_NAME" == "$expected" ]] || {
+              echo "release tag $GITHUB_REF_NAME does not match internal version $expected" >&2
+              exit 1
+            }
+          fi
+
+  build:
+    needs: release-preflight
+    permissions:
+      contents: read
+    env:
+      XRAY_VERSION: v26.7.11
+      MTG_MULTI_VERSION: v1.15.0
+      GEODATA_VERSION: "202607242256"
+      IRAN_GEODATA_VERSION: "202607250659"
+      RUSSIA_GEODATA_VERSION: "202607251625"
     strategy:
       # One platform hitting a transient outage must not cancel the other six.
       fail-fast: false
@@ -124,7 +157,7 @@ jobs:
           cd x-ui/bin
 
           # Download dependencies
-          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.7.11/"
+          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/"
           if [ "${{ matrix.platform }}" == "amd64" ]; then
             fetch ${Xray_URL}Xray-linux-64.zip
             unzip Xray-linux-64.zip
@@ -155,12 +188,12 @@ jobs:
             rm -f Xray-linux-s390x.zip
           fi
           rm -f geoip.dat geosite.dat
-          fetch https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-          fetch https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-          fetch -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
-          fetch -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
-          fetch -O geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
-          fetch -O geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+          fetch "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geoip.dat"
+          fetch "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geosite.dat"
+          fetch -O geoip_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geoip.dat"
+          fetch -O geosite_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geosite.dat"
+          fetch -O geoip_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geoip.dat"
+          fetch -O geosite_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geosite.dat"
           mv xray xray-linux-${{ matrix.platform }}
           # mtg-multi (MTProto sidecar) ships prebuilt release binaries whose
           # platform labels match our matrix, so download and unpack the matching
@@ -171,10 +204,8 @@ jobs:
           # has 503'd whole release runs while asset downloads kept working.
           case "${{ matrix.platform }}" in
             amd64|arm64|armv7|armv6|armv5|386|s390x)
-              MTG_MULTI_VER=$(curl -sf $CURL_RETRY -o /dev/null -w '%{redirect_url}' "https://github.com/mhsanaei/mtg-multi/releases/latest" | sed -n 's#.*/releases/tag/##p')
-              if [ -z "$MTG_MULTI_VER" ]; then echo "could not resolve the latest mtg-multi release tag"; exit 1; fi
-              MTG_PKG="mtg-multi-${MTG_MULTI_VER#v}-linux-${{ matrix.platform }}"
-              curl -sfLRO $CURL_RETRY "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_MULTI_VER}/${MTG_PKG}.tar.gz"
+              MTG_PKG="mtg-multi-${MTG_MULTI_VERSION#v}-linux-${{ matrix.platform }}"
+              curl -sfLRO $CURL_RETRY "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_MULTI_VERSION}/${MTG_PKG}.tar.gz"
               tar -xzf "${MTG_PKG}.tar.gz"
               mv "${MTG_PKG}/mtg-multi" "mtg-linux-${{ matrix.platform }}"
               rm -rf "${MTG_PKG}" "${MTG_PKG}.tar.gz"
@@ -191,24 +222,20 @@ jobs:
           name: x-ui-linux-${{ matrix.platform }}
           path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
 
-      - name: Upload files to GH release
-        uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          file: x-ui-linux-${{ matrix.platform }}.tar.gz
-          asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
-          overwrite: true
-          prerelease: false
-
   # =================================
   #  Windows Build
   # =================================
   build-windows:
     name: Build for Windows
+    needs: release-preflight
     permissions:
-      contents: write
+      contents: read
+    env:
+      XRAY_VERSION: v26.7.11
+      MTG_MULTI_VERSION: v1.15.0
+      GEODATA_VERSION: "202607242256"
+      IRAN_GEODATA_VERSION: "202607250659"
+      RUSSIA_GEODATA_VERSION: "202607251625"
     strategy:
       matrix:
         platform:
@@ -282,27 +309,25 @@ jobs:
           cd x-ui\bin
 
           # Download Xray for Windows
-          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.7.11/"
+          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/$env:XRAY_VERSION/"
           Invoke-WebRequest @retry -Uri "${Xray_URL}Xray-windows-64.zip" -OutFile "Xray-windows-64.zip"
           Expand-Archive -Path "Xray-windows-64.zip" -DestinationPath .
           Remove-Item "Xray-windows-64.zip"
           Remove-Item geoip.dat, geosite.dat -ErrorAction SilentlyContinue
-          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" -OutFile "geoip.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" -OutFile "geosite.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat" -OutFile "geoip_IR.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat" -OutFile "geosite_IR.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat" -OutFile "geoip_RU.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat" -OutFile "geosite_RU.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geoip.dat" -OutFile "geoip.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geosite.dat" -OutFile "geosite.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geoip.dat" -OutFile "geoip_IR.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geosite.dat" -OutFile "geosite_IR.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geoip.dat" -OutFile "geoip_RU.dat"
+          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geosite.dat" -OutFile "geosite_RU.dat"
           Rename-Item xray.exe xray-windows-amd64.exe
 
           # mtg-multi (MTProto sidecar) publishes a prebuilt Windows binary, so
           # download and unpack it instead of compiling. The tag comes from the
           # release-page redirect on github.com — not api.github.com, whose
           # outages have failed release runs while asset downloads kept working.
-          $MTG_MULTI_VER = (curl.exe -sf --retry 5 --retry-all-errors --retry-delay 3 -o NUL -w '%{redirect_url}' "https://github.com/mhsanaei/mtg-multi/releases/latest") -replace '^.*/releases/tag/', ''
-          if (-not $MTG_MULTI_VER -or $MTG_MULTI_VER -notmatch '^v[\d.]+$') { throw "could not resolve the latest mtg-multi release tag" }
-          $MTG_PKG = "mtg-multi-$($MTG_MULTI_VER.TrimStart('v'))-windows-amd64"
-          curl.exe -sfLRO --retry 5 --retry-all-errors --retry-delay 3 "https://github.com/mhsanaei/mtg-multi/releases/download/$MTG_MULTI_VER/$MTG_PKG.zip"
+          $MTG_PKG = "mtg-multi-$($env:MTG_MULTI_VERSION.TrimStart('v'))-windows-amd64"
+          curl.exe -sfLRO --retry 5 --retry-all-errors --retry-delay 3 "https://github.com/mhsanaei/mtg-multi/releases/download/$env:MTG_MULTI_VERSION/$MTG_PKG.zip"
           Expand-Archive -Path "$MTG_PKG.zip" -DestinationPath "mtg-tmp" -Force
           Move-Item "mtg-tmp/$MTG_PKG/mtg-multi.exe" "mtg-windows-amd64.exe"
           Remove-Item -Recurse -Force "mtg-tmp", "$MTG_PKG.zip"
@@ -322,16 +347,115 @@ jobs:
           name: x-ui-windows-amd64
           path: ./x-ui-windows-amd64.zip
 
-      - name: Upload files to GH release
-        uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+  validate-linux-artifacts:
+    name: Execute Linux artifact (${{ matrix.platform }})
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [amd64, arm64, armv7, armv6, armv5, 386, s390x]
+    steps:
+      - uses: docker/setup-qemu-action@v4
+      - uses: actions/download-artifact@v8
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          file: x-ui-windows-amd64.zip
-          asset_name: x-ui-windows-amd64.zip
-          overwrite: true
-          prerelease: false
+          name: x-ui-linux-${{ matrix.platform }}
+      - name: Extract and execute packaged binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf "x-ui-linux-${{ matrix.platform }}.tar.gz"
+          test -x x-ui/x-ui
+          test -x "x-ui/bin/xray-linux-${{ matrix.platform }}"
+          test -x "x-ui/bin/mtg-linux-${{ matrix.platform }}"
+          timeout 30s x-ui/x-ui -v
+          timeout 30s "x-ui/bin/xray-linux-${{ matrix.platform }}" version
+          timeout 30s "x-ui/bin/mtg-linux-${{ matrix.platform }}" --version
+
+  validate-windows-artifact:
+    name: Execute Windows artifact
+    needs: build-windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: x-ui-windows-amd64
+      - name: Extract and execute packaged binaries
+        shell: pwsh
+        run: |
+          Expand-Archive -Path x-ui-windows-amd64.zip -DestinationPath extracted
+          if (-not (Test-Path extracted\x-ui\x-ui.exe)) { throw "x-ui.exe missing" }
+          if (-not (Test-Path extracted\x-ui\bin\xray-windows-amd64.exe)) { throw "xray executable missing" }
+          if (-not (Test-Path extracted\x-ui\bin\mtg-windows-amd64.exe)) { throw "mtg executable missing" }
+          & extracted\x-ui\x-ui.exe -v
+          if ($LASTEXITCODE -ne 0) { throw "x-ui.exe failed" }
+          & extracted\x-ui\bin\xray-windows-amd64.exe version
+          if ($LASTEXITCODE -ne 0) { throw "xray executable failed" }
+          & extracted\x-ui\bin\mtg-windows-amd64.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "mtg executable failed" }
+
+  publish-stable:
+    name: Publish complete stable release
+    needs: [release-preflight, validate-linux-artifacts, validate-windows-artifact]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: stable-release-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+          merge-multiple: true
+      - name: Verify and publish atomically
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          expected=(
+            x-ui-linux-386.tar.gz
+            x-ui-linux-amd64.tar.gz
+            x-ui-linux-arm64.tar.gz
+            x-ui-linux-armv5.tar.gz
+            x-ui-linux-armv6.tar.gz
+            x-ui-linux-armv7.tar.gz
+            x-ui-linux-s390x.tar.gz
+            x-ui-windows-amd64.zip
+          )
+          for asset in "${expected[@]}"; do
+            test -s "release-artifacts/$asset" || {
+              echo "missing or empty release asset: $asset" >&2
+              exit 1
+            }
+          done
+          artifact_count="$(find release-artifacts -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l)"
+          test "$artifact_count" -eq "${#expected[@]}" || {
+            echo "expected ${#expected[@]} platform assets, found $artifact_count" >&2
+            exit 1
+          }
+          (
+            cd release-artifacts
+            sha256sum "${expected[@]}" > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
+          notes="NovaPanel ${TAG}. All platform artifacts completed successfully before this release was made public. Verify downloads with the attached SHA256SUMS file."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft --title "NovaPanel $TAG" --notes "$notes"
+          else
+            gh release create "$TAG" --verify-tag --draft --title "NovaPanel $TAG" --notes "$notes"
+          fi
+          gh release upload "$TAG" release-artifacts/* --clobber
+          gh release edit "$TAG" --draft=false --prerelease=false --latest
 
   # =================================
   #  Rolling dev channel (per-commit)
@@ -343,7 +467,7 @@ jobs:
   # channel is unaffected.
   publish-dev:
     name: Publish rolling dev release
-    needs: [build, build-windows]
+    needs: [validate-linux-artifacts, validate-windows-artifact]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -385,6 +509,12 @@ jobs:
 
           Automated per-commit build from main. Not a stable release."
 
+          (
+            cd dev-artifacts
+            sha256sum *.tar.gz *.zip > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
           # Force-move the dev-latest tag to this commit so the release tracks it.
           git tag -f dev-latest "${COMMIT}"
           retry git push -f origin refs/tags/dev-latest
@@ -397,4 +527,4 @@ jobs:
               --target "${COMMIT}" --title "Dev build ${short}" --notes "${notes}"
           fi
 
-          retry gh release upload dev-latest dev-artifacts/*.tar.gz dev-artifacts/*.zip --clobber
+          retry gh release upload dev-latest dev-artifacts/*.tar.gz dev-artifacts/*.zip dev-artifacts/SHA256SUMS --clobber

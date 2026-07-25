@@ -1,0 +1,44 @@
+name: Prepare upstream sync
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Merge upstream/main without importing upstream tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/MHSanaei/3x-ui.git
+          git fetch upstream main --no-tags
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "NovaPanel already contains upstream/main."
+            echo "NO_CHANGES=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          branch="automation/upstream-sync-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git merge --no-ff upstream/main -m "merge: sync upstream 3x-ui into NovaPanel"
+          git push origin "$branch"
+          echo "SYNC_BRANCH=$branch" >> "$GITHUB_ENV"
+      - name: Open review pull request
+        if: env.NO_CHANGES != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "$SYNC_BRANCH" \
+            --title "merge: sync upstream 3x-ui into NovaPanel" \
+            --body "Automated upstream merge prepared without fetching upstream tags. CI and CodeQL must pass before this is merged."

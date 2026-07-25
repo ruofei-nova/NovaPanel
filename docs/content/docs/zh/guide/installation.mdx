@@ -28,7 +28,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/ins
 在命令后附加标签即可安装**指定版本**：
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.4.0
+bash <(curl -Ls https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/install.sh) v3.5.3
 ```
 
 传入 `dev-latest` 可安装滚动更新的**开发版**构建（来自 `main` 的最新逐提交预发布版本
@@ -64,6 +64,13 @@ docker compose --profile postgres up -d
 [IP 限制](/docs/operations/security)），其封禁通过 `iptables` 实现，因此需要 `NET_ADMIN`
 （IPv6 还需 `NET_RAW`）——
 否则封禁只会被记录，而不会实际生效：
+
+GHCR 镜像会保持私有。拉取前，请使用具有 `read:packages` 权限的 GitHub
+令牌登录（不要把令牌直接写进命令历史）：
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u 您的GitHub用户名 --password-stdin
+```
 
 ```bash title="docker run"
 docker run -d \

@@ -1,8 +1,17 @@
 #!/bin/sh
 set -eu
 
+# Keep Docker builds reproducible and independent from the unauthenticated
+# GitHub "latest release" API. Renovate these pins deliberately in a tested
+# release instead of silently changing container contents between rebuilds.
+XRAY_VERSION="${XRAY_VERSION:-v26.7.11}"
+MTG_MULTI_VERSION="${MTG_MULTI_VERSION:-v1.15.0}"
+GEODATA_VERSION="${GEODATA_VERSION:-202607242256}"
+IRAN_GEODATA_VERSION="${IRAN_GEODATA_VERSION:-202607250659}"
+RUSSIA_GEODATA_VERSION="${RUSSIA_GEODATA_VERSION:-202607251625}"
+
 case "${1:-}" in
-    amd64)
+    "" | amd64 | x86_64)
         ARCH="64"
         XRAY_FNAME="amd64"
         MTG_ARCH="amd64"
@@ -22,6 +31,10 @@ case "${1:-}" in
         ;;
     arm)
         case "${2:-v7}" in
+            v5 | 5)
+                ARCH="arm32-v5"
+                MTG_ARCH="armv5"
+                ;;
             v6 | 6)
                 ARCH="arm32-v6"
                 MTG_ARCH="armv6"
@@ -67,29 +80,24 @@ case "${1:-}" in
         exit 1
         ;;
 esac
-MTG_MULTI_VER=$(curl -sfL "https://api.github.com/repos/mhsanaei/mtg-multi/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)
-if [ -z "$MTG_MULTI_VER" ]; then
-    echo "DockerInit: could not resolve the latest mtg-multi release tag" >&2
-    exit 1
-fi
 mkdir -p build/bin
 cd build/bin
-curl -sfLRO "https://github.com/XTLS/Xray-core/releases/download/v26.7.11/Xray-linux-${ARCH}.zip"
+curl -sfLRO "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${ARCH}.zip"
 unzip "Xray-linux-${ARCH}.zip"
 rm -f "Xray-linux-${ARCH}.zip" geoip.dat geosite.dat
 mv xray "xray-linux-${XRAY_FNAME}"
 # mtg-multi (MTProto sidecar) ships prebuilt release binaries for every target
 # we package, so download and unpack the matching one instead of compiling.
-MTG_PKG="mtg-multi-${MTG_MULTI_VER#v}-linux-${MTG_ARCH}"
-curl -sfLRO "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_MULTI_VER}/${MTG_PKG}.tar.gz"
+MTG_PKG="mtg-multi-${MTG_MULTI_VERSION#v}-linux-${MTG_ARCH}"
+curl -sfLRO "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_MULTI_VERSION}/${MTG_PKG}.tar.gz"
 tar -xzf "${MTG_PKG}.tar.gz"
 mv "${MTG_PKG}/mtg-multi" "mtg-linux-${MTG_FNAME}"
 rm -rf "${MTG_PKG}" "${MTG_PKG}.tar.gz"
 chmod +x "mtg-linux-${MTG_FNAME}"
-curl -sfLRO https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-curl -sfLRO https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-curl -sfLRo geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
-curl -sfLRo geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
-curl -sfLRo geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
-curl -sfLRo geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+curl -sfLRO "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geoip.dat"
+curl -sfLRO "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geosite.dat"
+curl -sfLRo geoip_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geoip.dat"
+curl -sfLRo geosite_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geosite.dat"
+curl -sfLRo geoip_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geoip.dat"
+curl -sfLRo geosite_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geosite.dat"
 cd ../../
