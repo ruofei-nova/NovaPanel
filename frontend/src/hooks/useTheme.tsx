@@ -29,50 +29,71 @@ const initialUltra = readBool(STORAGE_ULTRA, false);
 applyDom(initialDark, initialUltra);
 
 const DARK_TOKENS = {
-  colorBgBase: '#1a1b1f',
-  colorBgLayout: '#1a1b1f',
-  colorBgContainer: '#23252b',
-  colorBgElevated: '#2d2f37',
+  colorPrimary: '#55e6d2',
+  colorPrimaryHover: '#73f2df',
+  colorPrimaryActive: '#2bbda9',
+  colorInfo: '#55e6d2',
+  colorSuccess: '#4cdda8',
+  colorWarning: '#ffb248',
+  colorError: '#ff5f5b',
+  colorBgBase: '#061116',
+  colorBgLayout: '#061116',
+  colorBgContainer: '#0b1b21',
+  colorBgElevated: '#10262d',
+  colorBorder: 'rgba(106, 231, 215, 0.2)',
+  colorBorderSecondary: 'rgba(106, 231, 215, 0.12)',
+  colorText: 'rgba(235, 248, 247, 0.92)',
+  colorTextSecondary: 'rgba(216, 236, 234, 0.68)',
+  colorTextTertiary: 'rgba(196, 219, 217, 0.48)',
+  borderRadius: 9,
+  fontFamily: '"Inter", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif',
 };
 const ULTRA_DARK_TOKENS = {
-  colorBgBase: '#000',
-  colorBgLayout: '#000',
-  colorBgContainer: '#101013',
-  colorBgElevated: '#1a1a1e',
+  ...DARK_TOKENS,
+  colorBgBase: '#03090c',
+  colorBgLayout: '#03090c',
+  colorBgContainer: '#08161b',
+  colorBgElevated: '#0d2228',
 };
 const DARK_LAYOUT_TOKENS = {
-  bodyBg: '#1a1b1f',
-  headerBg: '#15161a',
+  bodyBg: '#061116',
+  headerBg: '#071419',
   headerColor: '#ffffff',
-  footerBg: '#1a1b1f',
-  siderBg: '#15161a',
-  triggerBg: '#23252b',
+  footerBg: '#061116',
+  siderBg: '#061217',
+  triggerBg: '#0b1b21',
   triggerColor: '#ffffff',
 };
 const ULTRA_DARK_LAYOUT_TOKENS = {
-  bodyBg: '#000',
-  headerBg: '#050507',
+  bodyBg: '#03090c',
+  headerBg: '#030b0e',
   headerColor: '#ffffff',
-  footerBg: '#000',
-  siderBg: '#050507',
-  triggerBg: '#1a1a1e',
+  footerBg: '#03090c',
+  siderBg: '#030b0e',
+  triggerBg: '#08161b',
   triggerColor: '#ffffff',
 };
 const DARK_MENU_TOKENS = {
-  darkItemBg: '#15161a',
-  darkSubMenuItemBg: '#1a1b1f',
-  darkPopupBg: '#23252b',
+  darkItemBg: '#061217',
+  darkSubMenuItemBg: '#07161b',
+  darkPopupBg: '#0b1b21',
+  darkItemSelectedBg: 'rgba(85, 230, 210, 0.13)',
+  darkItemSelectedColor: '#73f2df',
+  darkItemHoverBg: 'rgba(85, 230, 210, 0.08)',
 };
 const ULTRA_DARK_MENU_TOKENS = {
-  darkItemBg: '#050507',
-  darkSubMenuItemBg: '#000',
-  darkPopupBg: '#101013',
+  ...DARK_MENU_TOKENS,
+  darkItemBg: '#030b0e',
+  darkSubMenuItemBg: '#041014',
+  darkPopupBg: '#08161b',
 };
 const DARK_CARD_TOKENS = {
-  colorBorderSecondary: 'rgba(255, 255, 255, 0.06)',
+  colorBorderSecondary: 'rgba(85, 230, 210, 0.12)',
+  headerBg: 'transparent',
 };
 const ULTRA_DARK_CARD_TOKENS = {
-  colorBorderSecondary: 'rgba(255, 255, 255, 0.04)',
+  colorBorderSecondary: 'rgba(85, 230, 210, 0.1)',
+  headerBg: 'transparent',
 };
 const STATISTIC_TOKENS = {
   contentFontSize: 17,
@@ -111,6 +132,20 @@ export function buildAntdThemeConfig(isDark: boolean, isUltra: boolean): ThemeCo
       Menu: isUltra ? ULTRA_DARK_MENU_TOKENS : DARK_MENU_TOKENS,
       Card: isUltra ? ULTRA_DARK_CARD_TOKENS : DARK_CARD_TOKENS,
       Statistic: STATISTIC_TOKENS,
+      Table: {
+        headerBg: isUltra ? '#08161b' : '#0b1b21',
+        headerColor: 'rgba(235, 248, 247, 0.78)',
+        rowHoverBg: 'rgba(85, 230, 210, 0.055)',
+        borderColor: 'rgba(85, 230, 210, 0.11)',
+      },
+      Button: {
+        primaryShadow: '0 0 20px rgba(85, 230, 210, 0.16)',
+      },
+      Input: {
+        activeBorderColor: '#55e6d2',
+        hoverBorderColor: 'rgba(85, 230, 210, 0.55)',
+        activeShadow: '0 0 0 2px rgba(85, 230, 210, 0.1)',
+      },
     },
   };
 }

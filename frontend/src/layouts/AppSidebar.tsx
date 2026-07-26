@@ -34,6 +34,7 @@ import { HttpUtil } from '@/utils';
 import { formatPanelVersion } from '@/lib/panel-version';
 import { pauseAnimationsUntilLeave, useTheme } from '@/hooks/useTheme';
 import { useAllSettings } from '@/api/queries/useAllSettings';
+import NovaLogo from '@/components/NovaLogo';
 import './AppSidebar.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'isSidebarCollapsed';
@@ -228,6 +229,7 @@ export default function AppSidebar() {
       >
         <div className={`sider-brand${collapsed ? ' sider-brand-collapsed' : ''}`}>
           <div className="brand-block">
+            <NovaLogo size={collapsed ? 34 : 30} className="sidebar-logo" />
             <span className="brand-text">{collapsed ? 'NP' : 'Nova Panel'}</span>
           </div>
           {!collapsed && (
@@ -280,6 +282,7 @@ export default function AppSidebar() {
       >
         <div className="drawer-header">
           <div className="brand-block">
+            <NovaLogo size={30} className="sidebar-logo" />
             <span className="drawer-brand">Nova Panel</span>
           </div>
           <div className="drawer-header-actions">

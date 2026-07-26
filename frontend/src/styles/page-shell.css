@@ -20,8 +20,8 @@
 .nodes-page.is-dark,
 .groups-page.is-dark,
 .api-docs-page.is-dark {
-  --bg-page: #1a1b1f;
-  --bg-card: #23252b;
+  --bg-page: #061116;
+  --bg-card: #0b1b21;
 }
 
 .index-page.is-dark.is-ultra,
@@ -32,8 +32,8 @@
 .nodes-page.is-dark.is-ultra,
 .groups-page.is-dark.is-ultra,
 .api-docs-page.is-dark.is-ultra {
-  --bg-page: #000;
-  --bg-card: #101013;
+  --bg-page: #03090c;
+  --bg-card: #08161b;
 }
 
 .index-page .ant-layout,
@@ -187,13 +187,90 @@ body.dark .ant-dropdown-menu-item-divider {
 }
 
 .hosts-page.is-dark {
-  --bg-page: #1a1b1f;
-  --bg-card: #23252b;
+  --bg-page: #061116;
+  --bg-card: #0b1b21;
 }
 
 .hosts-page.is-dark.is-ultra {
-  --bg-page: #000;
-  --bg-card: #101013;
+  --bg-page: #03090c;
+  --bg-card: #08161b;
+}
+
+/* Nova telemetry skin shared by every functional page. */
+body.dark {
+  background: #061116;
+}
+
+body.dark .index-page,
+body.dark .clients-page,
+body.dark .inbounds-page,
+body.dark .xray-page,
+body.dark .settings-page,
+body.dark .nodes-page,
+body.dark .groups-page,
+body.dark .hosts-page,
+body.dark .api-docs-page {
+  background:
+    radial-gradient(circle at 78% -10%, rgba(33, 104, 104, 0.13), transparent 32%),
+    linear-gradient(180deg, #071419, #050e12 72%);
+}
+
+body.dark .content-area {
+  max-width: 1680px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+body.dark .ant-card,
+body.dark .ant-modal-content,
+body.dark .ant-drawer-content,
+body.dark .ant-popover-inner,
+body.dark .ant-dropdown-menu {
+  border-color: rgba(85, 230, 210, 0.12);
+  background: linear-gradient(145deg, rgba(11, 27, 33, 0.98), rgba(7, 20, 25, 0.98));
+}
+
+body.dark .ant-card-head {
+  min-height: 50px;
+  border-bottom-color: rgba(85, 230, 210, 0.1);
+}
+
+body.dark .ant-card-head-title,
+body.dark .ant-modal-title {
+  font-weight: 600;
+  letter-spacing: 0.015em;
+}
+
+body.dark .ant-table-wrapper .ant-table,
+body.dark .ant-table-wrapper .ant-table-container {
+  background: transparent;
+}
+
+body.dark .ant-table-tbody > tr > td,
+body.dark .ant-table-thead > tr > th {
+  border-bottom-color: rgba(85, 230, 210, 0.1);
+}
+
+body.dark .ant-tabs .ant-tabs-ink-bar {
+  box-shadow: 0 0 14px rgba(85, 230, 210, 0.45);
+}
+
+body.dark .ant-btn-primary {
+  color: #04110f;
+  font-weight: 650;
+}
+
+body.dark .ant-input,
+body.dark .ant-input-affix-wrapper,
+body.dark .ant-select-selector,
+body.dark .ant-input-number,
+body.dark .ant-picker {
+  background: rgba(2, 12, 15, 0.54) !important;
+  border-color: rgba(85, 230, 210, 0.16) !important;
+}
+
+@media (max-width: 768px) {
+  body.dark .content-area { padding-top: 64px; }
 }
 
 .hosts-page .ant-layout,

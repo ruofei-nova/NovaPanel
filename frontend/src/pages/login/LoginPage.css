@@ -372,3 +372,90 @@
   margin-bottom: 0;
 }
 
+/* Final NovaPanel login direction: quiet, private and precise. */
+.login-app.is-dark,
+.login-app.is-dark.is-ultra {
+  --bg-page: #061116;
+  --bg-card: rgba(9, 24, 29, 0.96);
+  --bg-card-solid: #09181d;
+  --color-text: rgba(238, 250, 248, 0.94);
+  --color-text-subtle: rgba(210, 232, 229, 0.58);
+  --color-accent: #55e6d2;
+  --color-border: rgba(85, 230, 210, 0.17);
+  --shadow-card: 0 28px 80px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255,255,255,.025);
+  --grid-color: rgba(85, 230, 210, 0.018);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(35, 108, 105, 0.12), transparent 34%),
+    linear-gradient(145deg, #071419, #030a0d);
+}
+
+.login-app::before,
+.login-app::after,
+.login-content::before,
+.login-content::after,
+.login-wrapper::before {
+  display: none;
+}
+
+.login-wrapper::after {
+  opacity: 0.7;
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 8%, transparent 66%);
+  mask-image: radial-gradient(ellipse at center, black 8%, transparent 66%);
+}
+
+.login-card {
+  max-width: 374px;
+  padding: 34px 30px 28px;
+  border-radius: 12px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.login-card::before {
+  display: none;
+}
+
+.login-app.is-dark .brand-name,
+.login-app.is-dark.is-ultra .brand-name {
+  color: var(--color-text);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  font-size: 27px;
+  letter-spacing: 0.04em;
+}
+
+.login-app.is-dark .brand-accent,
+.login-app.is-dark.is-ultra .brand-accent {
+  width: 34px;
+  height: 2px;
+  background: #55e6d2;
+  box-shadow: 0 0 12px rgba(85, 230, 210, 0.35);
+}
+
+.login-app .welcome {
+  margin: 14px 0 24px;
+  color: rgba(210, 232, 229, 0.58);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.login-toolbar .toolbar-btn {
+  border-color: rgba(85, 230, 210, 0.15);
+  background: rgba(6, 19, 23, 0.72);
+}
+
+.login-app .ant-input-affix-wrapper {
+  min-height: 44px;
+  border-color: rgba(85, 230, 210, 0.16);
+  background: rgba(2, 11, 14, 0.58);
+}
+
+.login-app .ant-btn-primary {
+  min-height: 44px;
+  color: #04110f;
+  font-weight: 700;
+  background: linear-gradient(90deg, #3bc7b4, #69decf);
+  box-shadow: 0 0 24px rgba(85, 230, 210, 0.14);
+}
+

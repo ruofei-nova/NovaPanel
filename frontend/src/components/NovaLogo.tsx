@@ -1,20 +1,21 @@
-export default function NovaLogo() {
+export default function NovaLogo({ size = 72, className }: { size?: number; className?: string }) {
   return (
     <svg
-      width="72"
-      height="72"
+      className={className}
+      width={size}
+      height={size}
       viewBox="0 0 72 72"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
         <linearGradient id="hex" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#60A5FA" />
-          <stop offset="100%" stopColor="#2563EB" />
+          <stop offset="0%" stopColor="#73F2DF" />
+          <stop offset="100%" stopColor="#2BBDA9" />
         </linearGradient>
 
         <linearGradient id="bolt" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#E0F2FE" />
-          <stop offset="100%" stopColor="#38BDF8" />
+          <stop offset="0%" stopColor="#F0FFFC" />
+          <stop offset="100%" stopColor="#55E6D2" />
         </linearGradient>
 
         <filter id="glow">

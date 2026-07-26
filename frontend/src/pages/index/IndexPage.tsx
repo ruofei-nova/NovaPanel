@@ -48,6 +48,7 @@ import { LazyMount } from '@/components/utility';
 import { setMessageInstance } from '@/utils/messageBus';
 import StatusCard from './StatusCard';
 import XrayStatusCard from './XrayStatusCard';
+import GlobalNetworkMap from './GlobalNetworkMap';
 import type { PanelUpdateInfo } from './PanelUpdateModal';
 const JsonEditor = lazy(() => import('@/components/form/JsonEditor'));
 const PanelUpdateModal = lazy(() => import('./PanelUpdateModal'));
@@ -193,6 +194,10 @@ export default function IndexPage() {
                 <Row gutter={[isMobile ? 8 : 16, 12]}>
                   <Col span={24}>
                     <StatusCard status={status} isMobile={isMobile} />
+                  </Col>
+
+                  <Col span={24}>
+                    <GlobalNetworkMap />
                   </Col>
 
                   <Col xs={24} lg={12}>
