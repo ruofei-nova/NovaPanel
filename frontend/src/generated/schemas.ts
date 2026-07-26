@@ -2036,6 +2036,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "/",
         "type": "string"
       },
+      "city": {
+        "type": "string"
+      },
       "clientCount": {
         "example": 27,
         "type": "integer"
@@ -2046,6 +2049,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "configDirtyAt": {
         "format": "int64",
         "type": "integer"
+      },
+      "country": {
+        "type": "string"
       },
       "cpuPct": {
         "example": 23.5,
@@ -2106,6 +2112,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 42,
         "type": "integer"
       },
+      "latitude": {
+        "type": "number"
+      },
+      "longitude": {
+        "type": "number"
+      },
       "memPct": {
         "example": 45.1,
         "type": "number"
@@ -2130,6 +2142,10 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "outboundTag": {
         "type": "string"
+      },
+      "ownerUserId": {
+        "nullable": true,
+        "type": "integer"
       },
       "panelVersion": {
         "example": "v3.x.x",
@@ -2256,8 +2272,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "basePath": {
         "type": "string"
       },
+      "city": {
+        "type": "string"
+      },
       "clearApiToken": {
         "type": "boolean"
+      },
+      "country": {
+        "type": "string"
       },
       "enable": {
         "type": "boolean"
@@ -2278,11 +2300,21 @@ export const SCHEMAS: Record<string, unknown> = {
         },
         "type": "array"
       },
+      "latitude": {
+        "type": "number"
+      },
+      "longitude": {
+        "type": "number"
+      },
       "name": {
         "type": "string"
       },
       "outboundTag": {
         "type": "string"
+      },
+      "ownerUserId": {
+        "nullable": true,
+        "type": "integer"
       },
       "pinnedCertSha256": {
         "type": "string"
@@ -2349,6 +2381,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "/",
         "type": "string"
       },
+      "city": {
+        "type": "string"
+      },
       "clientCount": {
         "example": 25,
         "type": "integer"
@@ -2361,6 +2396,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 0,
         "format": "int64",
         "type": "integer"
+      },
+      "country": {
+        "type": "string"
       },
       "cpuPct": {
         "example": 12.5,
@@ -2424,6 +2462,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 42,
         "type": "integer"
       },
+      "latitude": {
+        "type": "number"
+      },
+      "longitude": {
+        "type": "number"
+      },
       "memPct": {
         "example": 45.2,
         "type": "number"
@@ -2449,6 +2493,10 @@ export const SCHEMAS: Record<string, unknown> = {
       "outboundTag": {
         "example": "direct",
         "type": "string"
+      },
+      "ownerUserId": {
+        "nullable": true,
+        "type": "integer"
       },
       "panelVersion": {
         "example": "v3.x.x",
@@ -2786,10 +2834,13 @@ export const SCHEMAS: Record<string, unknown> = {
   "User": {
     "description": "User represents a user account in Nova Panel.",
     "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
       "id": {
         "type": "integer"
       },
-      "password": {
+      "role": {
         "type": "string"
       },
       "username": {
@@ -2797,8 +2848,9 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "enabled",
       "id",
-      "password",
+      "role",
       "username"
     ],
     "type": "object"

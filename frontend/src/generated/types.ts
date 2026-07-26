@@ -478,9 +478,11 @@ export interface Node {
   address: string;
   allowPrivateAddress: boolean;
   basePath: string;
+  city?: string;
   clientCount: number;
   configDirty: boolean;
   configDirtyAt: number;
+  country?: string;
   cpuPct: number;
   createdAt: number;
   depletedCount: number;
@@ -494,12 +496,15 @@ export interface Node {
   lastError: string;
   lastHeartbeat: number;
   latencyMs: number;
+  latitude?: number;
+  longitude?: number;
   memPct: number;
   name: string;
   netDown: number;
   netUp: number;
   onlineCount: number;
   outboundTag: string;
+  ownerUserId?: number | null;
   panelVersion: string;
   parentGuid?: string;
   pinnedCertSha256: string;
@@ -521,13 +526,18 @@ export interface NodeMutationRequest {
   allowPrivateAddress: boolean;
   apiToken?: string | null;
   basePath: string;
+  city?: string;
   clearApiToken?: boolean;
+  country?: string;
   enable: boolean;
   id: number;
   inboundSyncMode: string;
   inboundTags: string[];
+  latitude?: number;
+  longitude?: number;
   name: string;
   outboundTag: string;
+  ownerUserId?: number | null;
   pinnedCertSha256: string;
   port: number;
   remark: string;
@@ -540,9 +550,11 @@ export interface NodeView {
   address: string;
   allowPrivateAddress: boolean;
   basePath: string;
+  city?: string;
   clientCount: number;
   configDirty: boolean;
   configDirtyAt: number;
+  country?: string;
   cpuPct: number;
   createdAt: number;
   depletedCount: number;
@@ -557,12 +569,15 @@ export interface NodeView {
   lastError: string;
   lastHeartbeat: number;
   latencyMs: number;
+  latitude?: number;
+  longitude?: number;
   memPct: number;
   name: string;
   netDown: number;
   netUp: number;
   onlineCount: number;
   outboundTag: string;
+  ownerUserId?: number | null;
   panelVersion: string;
   parentGuid?: string;
   pinnedCertSha256: string;
@@ -635,8 +650,9 @@ export interface Setting {
 }
 
 export interface User {
+  enabled: boolean;
   id: number;
-  password: string;
+  role: string;
   username: string;
 }
 
