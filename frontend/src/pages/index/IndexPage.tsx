@@ -12,32 +12,19 @@ import {
   Row,
   Space,
   Spin,
-  Statistic,
   Tag,
-  Tooltip,
 } from 'antd';
 import {
   BarsOutlined,
   ControlOutlined,
   CloudServerOutlined,
   CloudDownloadOutlined,
-  CloudUploadOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   AreaChartOutlined,
-  GlobalOutlined,
-  SwapOutlined,
-  EyeOutlined,
-  EyeInvisibleOutlined,
-  ThunderboltOutlined,
-  DesktopOutlined,
-  DatabaseOutlined,
-  ForkOutlined,
   CopyOutlined,
   TelegramFilled,
 } from '@ant-design/icons';
 
-import { HttpUtil, SizeFormatter, TimeFormatter, ClipboardManager, FileManager } from '@/utils';
+import { HttpUtil, ClipboardManager, FileManager } from '@/utils';
 import { formatPanelVersion } from '@/lib/panel-version';
 import { activateOnKey } from '@/utils/a11y';
 import { useTheme } from '@/hooks/useTheme';
@@ -46,9 +33,12 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import AppSidebar from '@/layouts/AppSidebar';
 import { LazyMount } from '@/components/utility';
 import { setMessageInstance } from '@/utils/messageBus';
+import { useAccount } from '@/api/account';
 import StatusCard from './StatusCard';
 import XrayStatusCard from './XrayStatusCard';
 import GlobalNetworkMap from './GlobalNetworkMap';
+import SystemSummaryStrip from './SystemSummaryStrip';
+import CustomerDashboard from './CustomerDashboard';
 import type { PanelUpdateInfo } from './PanelUpdateModal';
 const JsonEditor = lazy(() => import('@/components/form/JsonEditor'));
 const PanelUpdateModal = lazy(() => import('./PanelUpdateModal'));
@@ -60,13 +50,18 @@ const XrayLogModal = lazy(() => import('./XrayLogModal'));
 const VersionModal = lazy(() => import('./VersionModal'));
 import './IndexPage.css';
 
-export default function IndexPage() {
+function AdminIndexPage() {
   const { t } = useTranslation();
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { status, fetched, fetchError, refresh } = useStatusQuery();
   const { isMobile } = useMediaQuery();
   const [messageApi, messageContextHolder] = message.useMessage();
   useEffect(() => { setMessageInstance(messageApi); }, [messageApi]);
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [accessLogEnable, setAccessLogEnable] = useState(false);
   const [devChannelEnable, setDevChannelEnable] = useState(false);
@@ -78,7 +73,6 @@ export default function IndexPage() {
 
   const basePath = window.X_UI_BASE_PATH || '';
 
-  const [showIp, setShowIp] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
   const [panelUpdateOpen, setPanelUpdateOpen] = useState(false);
@@ -175,6 +169,20 @@ export default function IndexPage() {
 
         <Layout className="content-shell">
           <Layout.Content className="content-area">
+            <header className="dashboard-command-header">
+              <div>
+                <span className="dashboard-kicker">NOVAPANEL / CONTROL CENTER</span>
+                <h1>系统状态</h1>
+              </div>
+              <div className="dashboard-live-meta">
+                <time dateTime={clock.toISOString()}>
+                  {clock.toLocaleString('zh-CN', { hour12: false })}
+                </time>
+                <span className={`xray-live-state ${status.xray.state}`}>
+                  <i />Xray {status.xray.state === 'running' ? '运行中' : '状态异常'}
+                </span>
+              </div>
+            </header>
             <Spin
               spinning={loading || !fetched}
               delay={200}
@@ -191,7 +199,7 @@ export default function IndexPage() {
                   extra={<Button type="primary" onClick={refresh}>{t('refresh')}</Button>}
                 />
               ) : (
-                <Row gutter={[isMobile ? 8 : 16, 12]}>
+                <Row className="dashboard-grid" gutter={[isMobile ? 8 : 16, 12]}>
                   <Col span={24}>
                     <StatusCard status={status} isMobile={isMobile} />
                   </Col>
@@ -309,161 +317,8 @@ export default function IndexPage() {
                     />
                   </Col>
 
-                  <Col xs={24} lg={12}>
-                    <Card title={t('pages.index.operationHours')} hoverable>
-                      <Row gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={12}>
-                          <Statistic
-                            title="Xray"
-                            value={TimeFormatter.formatSecond(status.appStats.uptime)}
-                            prefix={<ThunderboltOutlined />}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic
-                            title="OS"
-                            value={TimeFormatter.formatSecond(status.uptime)}
-                            prefix={<DesktopOutlined />}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={12}>
-                    <Card title={t('usage')} hoverable>
-                      <Row gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.memory')}
-                            value={SizeFormatter.sizeFormat(status.appStats.mem)}
-                            prefix={<DatabaseOutlined />}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.threads')}
-                            value={status.appStats.threads}
-                            prefix={<ForkOutlined />}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={12}>
-                    <Card title={t('pages.index.overallSpeed')} hoverable>
-                      <Row gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.upload')}
-                            value={SizeFormatter.sizeFormat(status.netIO.up)}
-                            prefix={<ArrowUpOutlined />}
-                            suffix="/s"
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.download')}
-                            value={SizeFormatter.sizeFormat(status.netIO.down)}
-                            prefix={<ArrowDownOutlined />}
-                            suffix="/s"
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={12}>
-                    <Card title={t('pages.index.totalData')} hoverable>
-                      <Row gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.sent')}
-                            value={SizeFormatter.sizeFormat(status.netTraffic.sent)}
-                            prefix={<CloudUploadOutlined />}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic
-                            title={t('pages.index.received')}
-                            value={SizeFormatter.sizeFormat(status.netTraffic.recv)}
-                            prefix={<CloudDownloadOutlined />}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={12}>
-                    <Card
-                      title={t('pages.index.ipAddresses')}
-                      hoverable
-                      extra={
-                        <Tooltip
-                          title={t('pages.index.toggleIpVisibility')}
-                          placement={isMobile ? 'topRight' : 'top'}
-                        >
-                          {showIp ? (
-                            <EyeOutlined
-                              className="ip-toggle-icon"
-                              role="button"
-                              tabIndex={0}
-                              aria-label={t('pages.index.toggleIpVisibility')}
-                              onClick={() => setShowIp(false)}
-                              onKeyDown={activateOnKey(() => setShowIp(false))}
-                            />
-                          ) : (
-                            <EyeInvisibleOutlined
-                              className="ip-toggle-icon"
-                              role="button"
-                              tabIndex={0}
-                              aria-label={t('pages.index.toggleIpVisibility')}
-                              onClick={() => setShowIp(true)}
-                              onKeyDown={activateOnKey(() => setShowIp(true))}
-                            />
-                          )}
-                        </Tooltip>
-                      }
-                    >
-                      <Row className={showIp ? 'ip-visible' : 'ip-hidden'} gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={isMobile ? 24 : 12}>
-                          <Statistic
-                            title="IPv4"
-                            value={status.publicIP.ipv4}
-                            prefix={<GlobalOutlined />}
-                          />
-                        </Col>
-                        <Col span={isMobile ? 24 : 12}>
-                          <Statistic
-                            title="IPv6"
-                            value={status.publicIP.ipv6}
-                            prefix={<GlobalOutlined />}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={12}>
-                    <Card title={t('pages.index.connectionCount')} hoverable>
-                      <Row gutter={isMobile ? [8, 8] : 0}>
-                        <Col span={12}>
-                          <Statistic
-                            title="TCP"
-                            value={status.tcpCount}
-                            prefix={<SwapOutlined />}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic
-                            title="UDP"
-                            value={status.udpCount}
-                            prefix={<SwapOutlined />}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
+                  <Col span={24}>
+                    <SystemSummaryStrip status={status} />
                   </Col>
                 </Row>
               )}
@@ -555,4 +410,10 @@ export default function IndexPage() {
       </Layout>
     </ConfigProvider>
   );
+}
+
+export default function IndexPage() {
+  const { account } = useAccount();
+  if (account?.role === 'customer') return <CustomerDashboard />;
+  return <AdminIndexPage />;
 }

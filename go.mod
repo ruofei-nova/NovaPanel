@@ -34,6 +34,8 @@ require (
 	pgregory.net/rapid v1.3.0
 )
 
+require github.com/oschwald/maxminddb-golang/v2 v2.4.1
+
 require (
 	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect

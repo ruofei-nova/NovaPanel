@@ -4,9 +4,9 @@ Date: 2026-07-26
 
 ## Compared sources
 
-- Approved dashboard: `call_tLKXV2DIpjQhZwNhwfV1E0LM.png`
-- Implemented dashboard: `D:\桌面\NovaPanel\design-references\implementation-dashboard.png`
-- Combined dashboard comparison: `D:\桌面\NovaPanel\design-references\design-qa-dashboard.png`
+- Approved dashboard: Product Design option 1, `call_oN4RatKqrU8eu3z72JP0CW4G.png`
+- Implemented dashboard: `D:\桌面\NovaPanel\design-references\implementation-option1-final.png`
+- Combined dashboard comparison: `D:\桌面\NovaPanel\design-references\design-qa-option1.png`
 - Approved login: left panel of `call_DaqgNAyqYEJJ5F2yiwnEgsWr.png`
 - Implemented login: `D:\桌面\NovaPanel\design-references\implementation-login.png`
 - Combined login comparison: `D:\桌面\NovaPanel\design-references\design-qa-login.png`
@@ -14,8 +14,8 @@ Date: 2026-07-26
 ## QA result
 
 - Fidelity: passed. The implementation preserves the approved graphite/teal palette, restrained borders, compact typography, waveform telemetry, Nova branding, and world-network visual language.
-- Layout: passed. The production dashboard uses a full-width network map to keep live node state readable while retaining every original management card and route below it.
-- Dynamic behavior: passed. Resource telemetry uses rolling real status samples; the network canvas animates routes and pulses from real node status, latency, and location data.
+- Layout: passed. The production dashboard follows selected option 1 with four short telemetry modules, a dominant globe, a unified right-side operation rail, and a continuous responsive system summary. The node list requested for removal is not present.
+- Dynamic behavior: passed. Resource telemetry uses rolling real status samples. The world texture is mapped onto a WebGL sphere mesh, so continents, lighting, and real node markers rotate together on one three-dimensional axis. The removed node counter/list and decorative orbit lines are absent.
 - Functional coverage: passed. Existing navigation, forms, tables, settings, Xray tools, API documentation, language/theme controls, and login/2FA behavior remain in place.
 - Responsive behavior: passed. The shared grid and sidebar retain existing tablet/mobile breakpoints, cards wrap without overlap, and controls preserve usable target sizes.
 - Accessibility: passed. Interactive elements keep semantic Ant Design controls, labels, keyboard focus behavior, reduced-motion support, and non-color status labels.

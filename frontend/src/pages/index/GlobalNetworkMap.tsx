@@ -1,145 +1,244 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Card, Tag } from 'antd';
+import { Card } from 'antd';
+import * as THREE from 'three';
 
-import { useNodesQuery, type NodeRecord } from '@/api/queries/useNodesQuery';
-import worldMap from '@/assets/nova-world-map.png';
+import { useNetworkMapQuery } from '@/api/queries/useNetworkMapQuery';
+import globeTexture from '@/assets/nova-globe-texture.png';
 import './GlobalNetworkMap.css';
 
-interface Point {
-  x: number;
-  y: number;
+interface GlobeNode {
+  id: number;
+  longitude: number;
+  latitude: number;
   status: 'online' | 'slow' | 'offline';
-  label: string;
 }
 
-function hash(input: string): number {
-  let value = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    value ^= input.charCodeAt(i);
-    value = Math.imul(value, 16777619);
-  }
-  return value >>> 0;
-}
-
-function pointFor(node: NodeRecord, index: number): Point {
-  const seed = hash(`${node.guid || node.id}-${node.address || node.name || index}`);
-  const x = 0.08 + ((seed % 8200) / 10000);
-  const y = 0.22 + (((seed >>> 8) % 5200) / 10000);
-  const status = node.status !== 'online'
-    ? 'offline'
-    : (node.latencyMs || 0) >= 180 ? 'slow' : 'online';
+function toGlobeNode(node: {
+  id: number;
+  longitude: number;
+  latitude: number;
+  status: string;
+  latencyMs: number;
+}): GlobeNode {
   return {
-    x,
-    y,
-    status,
-    label: node.name || node.remark || `Node ${index + 1}`,
+    id: node.id,
+    longitude: node.longitude * (Math.PI / 180),
+    latitude: node.latitude * (Math.PI / 180),
+    status: node.status !== 'online'
+      ? 'offline'
+      : node.latencyMs >= 180 ? 'slow' : 'online',
   };
 }
 
+function globePosition(latitude: number, longitude: number, radius = 2.025) {
+  const latitudeScale = Math.cos(latitude);
+  return new THREE.Vector3(
+    radius * latitudeScale * Math.sin(longitude),
+    radius * Math.sin(latitude),
+    radius * latitudeScale * Math.cos(longitude),
+  );
+}
+
+function disposeObject(child: THREE.Object3D) {
+  if (!(child instanceof THREE.Mesh)) return;
+  child.geometry.dispose();
+  const material = child.material;
+  if (Array.isArray(material)) material.forEach((item) => item.dispose());
+  else material.dispose();
+}
+
 export default function GlobalNetworkMap() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { nodes, totals } = useNodesQuery();
-  const points = useMemo(() => nodes.filter((node) => node.enable).map(pointFor), [nodes]);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const networkGroupRef = useRef<THREE.Group | null>(null);
+  const { data } = useNetworkMapQuery();
+  const globeNodes = useMemo(
+    () => data.nodes
+      .filter((node) => node.latitude !== 0 || node.longitude !== 0)
+      .map(toGlobeNode),
+    [data.nodes],
+  );
+  const nodeByID = useMemo(
+    () => new Map(globeNodes.map((node) => [node.id, node])),
+    [globeNodes],
+  );
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return undefined;
+    const mount = mountRef.current;
+    if (!mount) return undefined;
 
-    let frame = 0;
-    let animationId = 0;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+    camera.position.set(0, 0.08, 7.55);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.28;
+    renderer.setClearColor(0x000000, 0);
+    mount.appendChild(renderer.domElement);
+
+    const globeGroup = new THREE.Group();
+    globeGroup.rotation.x = -0.08;
+    globeGroup.rotation.z = -0.12;
+    scene.add(globeGroup);
+
+    const texture = new THREE.TextureLoader().load(globeTexture);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+
+    const geometry = new THREE.SphereGeometry(2, 128, 96);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      color: 0x82d8cc,
+      emissive: 0x021516,
+      emissiveIntensity: 0.32,
+      metalness: 0.06,
+      roughness: 0.82,
+    });
+    globeGroup.add(new THREE.Mesh(geometry, material));
+
+    const networkGroup = new THREE.Group();
+    globeGroup.add(networkGroup);
+    networkGroupRef.current = networkGroup;
+
+    scene.add(new THREE.HemisphereLight(0x9ffff3, 0x010608, 1.35));
+    const keyLight = new THREE.DirectionalLight(0xb6fff6, 2.35);
+    keyLight.position.set(-3.5, 3.2, 4.5);
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0x1a9b90, 1.8);
+    rimLight.position.set(4, -1.5, -3);
+    scene.add(rimLight);
+
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.round(rect.width * ratio));
-      canvas.height = Math.max(1, Math.round(rect.height * ratio));
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const { width, height } = mount.getBoundingClientRect();
+      renderer.setSize(Math.max(1, width), Math.max(1, height), false);
+      camera.aspect = Math.max(1, width) / Math.max(1, height);
+      camera.updateProjectionMatrix();
     };
-
-    const draw = () => {
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      ctx.clearRect(0, 0, width, height);
-      const hub = points[0] || { x: 0.64, y: 0.47, status: 'online' as const, label: 'NovaPanel' };
-      const pulse = (Math.sin(frame / 28) + 1) / 2;
-
-      for (const point of points.slice(1)) {
-        const startX = hub.x * width;
-        const startY = hub.y * height;
-        const endX = point.x * width;
-        const endY = point.y * height;
-        const midX = (startX + endX) / 2;
-        const bend = Math.max(18, Math.abs(endX - startX) * 0.15);
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.quadraticCurveTo(midX, Math.min(startY, endY) - bend, endX, endY);
-        ctx.strokeStyle = point.status === 'offline'
-          ? 'rgba(255, 95, 91, 0.34)'
-          : point.status === 'slow'
-            ? 'rgba(255, 178, 72, 0.36)'
-            : 'rgba(85, 230, 210, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      const visiblePoints = points.length > 0 ? points : [hub];
-      for (const point of visiblePoints) {
-        const x = point.x * width;
-        const y = point.y * height;
-        const color = point.status === 'offline'
-          ? '#ff5f5b'
-          : point.status === 'slow' ? '#ffb248' : '#55e6d2';
-        ctx.beginPath();
-        ctx.arc(x, y, 8 + pulse * 5, 0, Math.PI * 2);
-        ctx.fillStyle = `${color}18`;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x, y, 3.1, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 14;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-
-      frame += 1;
-      animationId = window.requestAnimationFrame(draw);
-    };
-
-    resize();
     const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    draw();
-    return () => {
-      observer.disconnect();
-      window.cancelAnimationFrame(animationId);
+    observer.observe(mount);
+    resize();
+
+    const timer = new THREE.Timer();
+    let animationId = 0;
+    const animate = () => {
+      timer.update();
+      const delta = Math.min(timer.getDelta(), 0.05);
+      globeGroup.rotation.y += delta * 0.18;
+      for (const child of networkGroup.children) {
+        if (child.userData.pulse) {
+          const scale = 0.84 + Math.sin(timer.getElapsed() * 3.2 + child.userData.phase) * 0.2;
+          child.scale.setScalar(scale);
+        }
+      }
+      renderer.render(scene, camera);
+      animationId = window.requestAnimationFrame(animate);
     };
-  }, [points]);
+    animate();
+
+    return () => {
+      window.cancelAnimationFrame(animationId);
+      observer.disconnect();
+      networkGroupRef.current = null;
+      for (const child of networkGroup.children) disposeObject(child);
+      geometry.dispose();
+      material.dispose();
+      texture.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const group = networkGroupRef.current;
+    if (!group) return;
+
+    for (const child of [...group.children]) {
+      group.remove(child);
+      disposeObject(child);
+    }
+
+    for (const node of globeNodes.slice(0, 48)) {
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 12, 12),
+        new THREE.MeshBasicMaterial({
+          color: node.status === 'offline'
+            ? 0xff5f5b
+            : node.status === 'slow' ? 0xffb248 : 0x55e6d2,
+        }),
+      );
+      marker.position.copy(globePosition(node.latitude, node.longitude));
+      marker.userData.pulse = true;
+      marker.userData.phase = node.id;
+      group.add(marker);
+    }
+
+    for (const [index, connection] of data.connections.slice(0, 80).entries()) {
+      const node = nodeByID.get(connection.nodeId);
+      if (!node) continue;
+      const source = globePosition(
+        connection.latitude * (Math.PI / 180),
+        connection.longitude * (Math.PI / 180),
+      );
+      const target = globePosition(node.latitude, node.longitude);
+      const midpoint = source.clone().add(target).multiplyScalar(0.5);
+      const distance = source.distanceTo(target);
+      midpoint.normalize().multiplyScalar(2.15 + Math.min(0.9, distance * 0.24));
+      const curve = new THREE.QuadraticBezierCurve3(source, midpoint, target);
+      const line = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 36, 0.009, 6, false),
+        new THREE.MeshBasicMaterial({
+          color: 0x53ead7,
+          transparent: true,
+          opacity: 0.48,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      group.add(line);
+
+      const sourceMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.026 + Math.min(connection.activeCount, 8) * 0.003, 10, 10),
+        new THREE.MeshBasicMaterial({
+          color: 0x8cfff0,
+          transparent: true,
+          opacity: 0.92,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      sourceMarker.position.copy(source);
+      sourceMarker.userData.pulse = true;
+      sourceMarker.userData.phase = index * 0.7;
+      group.add(sourceMarker);
+    }
+  }, [data.connections, globeNodes, nodeByID]);
 
   return (
-    <Card
-      className="network-map-card"
-      title={
-        <span className="network-title">
-          <span>全球网络状态</span>
-          <Tag color={totals.offline > 0 ? 'warning' : 'success'}>
-            {totals.total} 个节点 · {totals.online} 在线
-          </Tag>
-        </span>
-      }
-    >
-      <div className="network-map-stage">
-        <img src={worldMap} alt="" aria-hidden="true" />
-        <canvas ref={canvasRef} aria-label={`全球网络状态，${totals.total} 个节点，${totals.online} 在线`} />
-        {points.length === 0 && <span className="network-empty">等待节点接入</span>}
-      </div>
+    <Card className="network-map-card globe-card" title="全球网络状态">
+      <div
+        ref={mountRef}
+        className="globe-stage globe-webgl"
+        aria-label="自动旋转的三维全球网络球体"
+      />
       <div className="network-legend" aria-hidden="true">
         <span><i className="online" />在线</span>
         <span><i className="slow" />高延迟</span>
         <span><i className="offline" />离线</span>
-        {totals.avgLatency > 0 && <b>平均延迟 {totals.avgLatency} ms</b>}
+        <b>LIVE NETWORK</b>
       </div>
+      <a
+        className="geo-attribution"
+        href="https://db-ip.com"
+        target="_blank"
+        rel="noreferrer"
+      >
+        IP Geolocation by DB-IP
+      </a>
     </Card>
   );
 }

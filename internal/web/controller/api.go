@@ -65,7 +65,22 @@ func (a *APIController) checkAPIAuth(c *gin.Context) {
 		}
 		return
 	}
+	user := session.GetLoginUser(c)
+	if user != nil && user.Role == panel.UserRoleCustomer {
+		if !customerAllowedAPIPath(c.Request.URL.Path) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"msg":     "customer accounts are limited to the assigned dashboard",
+			})
+			return
+		}
+	}
 	c.Next()
+}
+
+func customerAllowedAPIPath(path string) bool {
+	return strings.HasSuffix(path, "/panel/api/account/me") ||
+		strings.HasSuffix(path, "/panel/api/network/map")
 }
 
 // initRouter sets up the API routes for inbounds, server, and other endpoints.
@@ -77,6 +92,8 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	// advertise support, before CSRF/handlers read the body.
 	api.Use(middleware.ConfigEnvelopeMiddleware())
 	api.Use(middleware.CSRFMiddleware())
+
+	NewTenantController(api)
 
 	// Inbounds API
 	inbounds := api.Group("/inbounds")

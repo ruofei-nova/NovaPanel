@@ -61,7 +61,7 @@ export default function StatusCard({ status, isMobile }: StatusCardProps) {
     <Card className="status-card telemetry-card">
       <Row gutter={[12, isMobile ? 12 : 0]}>
         {metrics.map((metric) => (
-          <Col xs={24} sm={12} xl={6} key={metric.key}>
+          <Col xs={24} sm={12} lg={6} key={metric.key}>
             <section className="telemetry-tile" aria-label={`${metric.label} ${metric.percent}%`}>
               <div className="telemetry-heading">
                 <div>
@@ -77,7 +77,7 @@ export default function StatusCard({ status, isMobile }: StatusCardProps) {
               <div className="telemetry-chart">
                 <Sparkline
                   data={metric.history}
-                  height={78}
+                  height={46}
                   stroke="#55e6d2"
                   strokeWidth={1.8}
                   fillOpacity={0.2}

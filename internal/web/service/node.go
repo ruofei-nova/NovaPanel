@@ -421,6 +421,9 @@ func (s *NodeService) normalize(n *model.Node) error {
 		}
 	}
 	n.BasePath = normalizeBasePath(n.BasePath)
+	if n.Latitude < -90 || n.Latitude > 90 || n.Longitude < -180 || n.Longitude > 180 {
+		return common.NewError("node latitude or longitude is out of range")
+	}
 	return nil
 }
 
@@ -471,6 +474,11 @@ func (s *NodeService) Update(id int, in *model.Node) error {
 		"inbound_sync_mode":     in.InboundSyncMode,
 		"inbound_tags":          string(inboundTagsJSON),
 		"outbound_tag":          in.OutboundTag,
+		"owner_user_id":         in.OwnerUserID,
+		"country":               strings.TrimSpace(in.Country),
+		"city":                  strings.TrimSpace(in.City),
+		"latitude":              in.Latitude,
+		"longitude":             in.Longitude,
 	}
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {

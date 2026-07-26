@@ -1,0 +1,79 @@
+.customer-dashboard {
+  min-height: 100vh;
+}
+
+.customer-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 5;
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 10px;
+  color: #75dfd1;
+  background: #061416;
+  border-right: 1px solid rgba(77, 225, 207, 0.15);
+}
+
+.customer-brand {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(78, 230, 211, 0.45);
+  border-radius: 12px;
+  font-weight: 800;
+}
+
+.customer-nav-active {
+  padding: 11px;
+  color: #061416;
+  background: #65e4d3;
+  border-radius: 10px;
+}
+
+.customer-sidebar .ant-btn {
+  margin-top: auto;
+  color: #8ba9a6;
+}
+
+.customer-content {
+  min-width: 0;
+  margin-left: 68px;
+  padding: 20px 24px 28px;
+}
+
+.customer-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.customer-stats .ant-card {
+  border-color: rgba(76, 225, 207, 0.14);
+  background: rgba(7, 27, 29, 0.82);
+}
+
+.geo-attribution {
+  display: block;
+  margin-top: 8px;
+  color: rgba(135, 178, 172, 0.72);
+  font-size: 11px;
+  text-align: right;
+}
+
+@media (max-width: 800px) {
+  .customer-sidebar {
+    width: 54px;
+  }
+  .customer-content {
+    margin-left: 54px;
+    padding: 12px;
+  }
+  .customer-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

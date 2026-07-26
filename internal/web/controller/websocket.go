@@ -68,6 +68,11 @@ func (w *WebSocketController) HandleWebSocket(c *gin.Context) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
+	user := session.GetLoginUser(c)
+	if user == nil || user.Role != panel.UserRoleAdmin {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

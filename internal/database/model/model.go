@@ -37,8 +37,10 @@ const (
 // User represents a user account in Nova Panel.
 type User struct {
 	Id         int    `json:"id" gorm:"primaryKey;autoIncrement"`
-	Username   string `json:"username"`
-	Password   string `json:"password"`
+	Username   string `json:"username" gorm:"uniqueIndex;not null"`
+	Password   string `json:"-"`
+	Role       string `json:"role" gorm:"default:admin;index"`
+	Enabled    bool   `json:"enabled" gorm:"default:true"`
 	LoginEpoch int64  `json:"-" gorm:"default:0"`
 }
 
@@ -714,6 +716,11 @@ type Node struct {
 	InboundSyncMode     string   `json:"inboundSyncMode" form:"inboundSyncMode" gorm:"column:inbound_sync_mode;default:all" validate:"omitempty,oneof=all selected"`
 	InboundTags         []string `json:"inboundTags" form:"inboundTags" gorm:"serializer:json;column:inbound_tags"`
 	OutboundTag         string   `json:"outboundTag" form:"outboundTag" gorm:"column:outbound_tag"`
+	OwnerUserID         *int     `json:"ownerUserId,omitempty" form:"ownerUserId" gorm:"column:owner_user_id;index"`
+	Country             string   `json:"country,omitempty" form:"country"`
+	City                string   `json:"city,omitempty" form:"city"`
+	Latitude            float64  `json:"latitude,omitempty" form:"latitude"`
+	Longitude           float64  `json:"longitude,omitempty" form:"longitude"`
 
 	// Guid is the remote panel's stable self-identifier (its panelGuid),
 	// learned from each heartbeat. It is the globally stable node identity used

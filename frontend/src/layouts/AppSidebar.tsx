@@ -40,12 +40,13 @@ import './AppSidebar.css';
 const SIDEBAR_COLLAPSED_KEY = 'isSidebarCollapsed';
 const LOGOUT_KEY = '__logout__';
 
-type IconName = 'dashboard' | 'inbound' | 'team' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'logout' | 'apidocs' | 'outbound' | 'routing';
+type IconName = 'dashboard' | 'inbound' | 'team' | 'customers' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'logout' | 'apidocs' | 'outbound' | 'routing';
 
 const iconByName: Record<IconName, ComponentType> = {
   dashboard: DashboardOutlined,
   inbound: ImportOutlined,
   team: TeamOutlined,
+  customers: SafetyOutlined,
   groups: TagsOutlined,
   setting: SettingOutlined,
   tool: ToolOutlined,
@@ -120,6 +121,7 @@ export default function AppSidebar() {
     { key: '/', icon: 'dashboard', title: t('menu.dashboard') },
     { key: '/inbounds', icon: 'inbound', title: t('menu.inbounds') },
     { key: '/clients', icon: 'team', title: t('menu.clients') },
+    { key: '/customers', icon: 'customers', title: '客户账号' },
     { key: '/groups', icon: 'groups', title: t('menu.groups') },
     { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
     { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },

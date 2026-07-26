@@ -83,6 +83,9 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 			return nil, errors.New("invalid credentials")
 		}
 	}
+	if !user.Enabled {
+		return nil, errors.New("invalid credentials")
+	}
 
 	twoFactorEnable, err := s.settingService.GetTwoFactorEnable()
 	if err != nil {
@@ -90,7 +93,7 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 		return nil, err
 	}
 
-	if twoFactorEnable {
+	if twoFactorEnable && user.Role != UserRoleCustomer {
 		twoFactorToken, err := s.settingService.GetTwoFactorToken()
 		if err != nil {
 			logger.Warning("check two factor token err:", err)
@@ -158,6 +161,8 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 	if database.IsNotFound(err) {
 		user.Username = username
 		user.Password = hashedPassword
+		user.Role = UserRoleAdmin
+		user.Enabled = true
 		return db.Model(model.User{}).Create(user).Error
 	} else if err != nil {
 		return err

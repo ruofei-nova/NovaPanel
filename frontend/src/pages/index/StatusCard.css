@@ -8,12 +8,12 @@
 }
 
 .telemetry-card .ant-card-body {
-  padding: 12px;
+  padding: 8px;
 }
 
 .telemetry-tile {
-  min-height: 188px;
-  padding: 14px 15px 10px;
+  min-height: 128px;
+  padding: 10px 12px 8px;
   border: 1px solid rgba(85, 230, 210, 0.13);
   border-radius: 10px;
   background: linear-gradient(145deg, rgba(10, 27, 32, 0.9), rgba(5, 15, 19, 0.84));
@@ -38,7 +38,7 @@
   display: block;
   color: #73f2df;
   font-family: "Arial Narrow", "Roboto Condensed", ui-sans-serif, sans-serif;
-  font-size: 29px;
+  font-size: 25px;
   font-weight: 650;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -56,8 +56,8 @@
 }
 
 .telemetry-chart {
-  height: 78px;
-  margin: 3px -4px 1px;
+  height: 46px;
+  margin: 0 -4px;
   overflow: hidden;
 }
 

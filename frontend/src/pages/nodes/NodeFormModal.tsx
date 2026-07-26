@@ -16,7 +16,7 @@ import {
 import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import type { RemoteInboundOption } from '@/api/queries/useNodeMutations';
-import type { Msg } from '@/utils';
+import { HttpUtil, type Msg } from '@/utils';
 import { NodeFormSchema, type NodeFormValues, type ProbeResult } from '@/schemas/node';
 import { FormField, rhfZodValidate } from '@/components/form/rhf';
 import { useOutboundTagGroups } from '@/api/queries/useOutboundTags';
@@ -53,6 +53,11 @@ function defaultValues(): NodeFormValues {
     inboundSyncMode: 'all',
     inboundTags: [],
     outboundTag: '',
+    ownerUserId: null,
+    country: '',
+    city: '',
+    latitude: 0,
+    longitude: 0,
   };
 }
 
@@ -76,6 +81,7 @@ export default function NodeFormModal({
   const [fetchingInbounds, setFetchingInbounds] = useState(false);
   const [inboundOptions, setInboundOptions] = useState<RemoteInboundOption[]>([]);
   const [testResult, setTestResult] = useState<ProbeResult | null>(null);
+  const [customers, setCustomers] = useState<{ id: number; username: string; enabled: boolean }[]>([]);
   const scheme = useWatch({ control: methods.control, name: 'scheme' }) ?? 'https';
   const tlsVerifyMode = useWatch({ control: methods.control, name: 'tlsVerifyMode' }) ?? 'verify';
   const inboundSyncMode = useWatch({ control: methods.control, name: 'inboundSyncMode' }) ?? 'all';
@@ -118,6 +124,17 @@ export default function NodeFormModal({
     setTestResult(null);
   }, [open, mode, node, methods]);
 
+  useEffect(() => {
+    if (!open) return;
+    void HttpUtil.get<{ id: number; username: string; enabled: boolean }[]>(
+      '/panel/api/customers/list',
+      undefined,
+      { silent: true },
+    ).then((msg) => {
+      if (msg?.success && msg.obj) setCustomers(msg.obj);
+    });
+  }, [open]);
+
   const title = useMemo(
     () => (mode === 'edit' ? t('pages.nodes.editNode') : t('pages.nodes.addNode')),
     [mode, t],
@@ -142,6 +159,11 @@ export default function NodeFormModal({
       inboundSyncMode: values.inboundSyncMode,
       inboundTags: values.inboundSyncMode === 'selected' ? values.inboundTags : [],
       outboundTag: values.outboundTag || '',
+      ownerUserId: values.ownerUserId || null,
+      country: values.country?.trim() || '',
+      city: values.city?.trim() || '',
+      latitude: values.latitude || 0,
+      longitude: values.longitude || 0,
     };
     if (token) payload.apiToken = token;
     return payload;
@@ -255,6 +277,44 @@ export default function NodeFormModal({
               <Col xs={24} md={12}>
                 <FormField label={t('pages.nodes.remark')} name="remark">
                   <Input />
+                </FormField>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <FormField label="绑定客户" name="ownerUserId">
+                  <Select
+                    allowClear
+                    placeholder="管理员可见 / 未分配"
+                    options={customers.map((customer) => ({
+                      value: customer.id,
+                      label: `${customer.username}${customer.enabled ? '' : '（已停用）'}`,
+                    }))}
+                  />
+                </FormField>
+              </Col>
+              <Col xs={12} md={6}>
+                <FormField label="VPS 国家" name="country">
+                  <Input placeholder="Malaysia" />
+                </FormField>
+              </Col>
+              <Col xs={12} md={6}>
+                <FormField label="VPS 城市" name="city">
+                  <Input placeholder="Kuala Lumpur" />
+                </FormField>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col xs={12}>
+                <FormField label="VPS 纬度" name="latitude">
+                  <InputNumber min={-90} max={90} step={0.0001} style={{ width: '100%' }} />
+                </FormField>
+              </Col>
+              <Col xs={12}>
+                <FormField label="VPS 经度" name="longitude">
+                  <InputNumber min={-180} max={180} step={0.0001} style={{ width: '100%' }} />
                 </FormField>
               </Col>
             </Row>
