@@ -32,6 +32,20 @@ func (s *InboundService) GetAllInboundLinks(host string, userId int) ([]string, 
 	if err != nil {
 		return nil, err
 	}
+	if err := (&TenantScopeService{}).FilterInboundClientData(userId, inbounds); err != nil {
+		return nil, err
+	}
+	return registeredSubLinkProvider.LinksForInbounds(host, inbounds), nil
+}
+
+func (s *InboundService) GetAllInboundLinksForAdmin(host string) ([]string, error) {
+	if registeredSubLinkProvider == nil {
+		return nil, common.NewError("sub link provider not registered")
+	}
+	inbounds, err := s.GetAllInbounds()
+	if err != nil {
+		return nil, err
+	}
 	return registeredSubLinkProvider.LinksForInbounds(host, inbounds), nil
 }
 

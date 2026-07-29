@@ -31,6 +31,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useNodesQuery } from '@/api/queries/useNodesQuery';
+import { useAccount } from '@/api/account';
 import AppSidebar from '@/layouts/AppSidebar';
 const TextModal = lazy(() => import('@/components/feedback/TextModal'));
 import type { TextModalTab } from '@/components/feedback/TextModal';
@@ -73,6 +74,8 @@ interface ClientMatchTarget {
 
 export default function InboundsPage() {
   const { t } = useTranslation();
+  const { account } = useAccount();
+  const isCustomer = account?.role === 'customer';
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { isMobile } = useMediaQuery();
 
@@ -121,7 +124,7 @@ export default function InboundsPage() {
   useWebSocket({
     traffic: applyTrafficEvent,
     client_stats: applyClientStatsEvent,
-  });
+  }, !isCustomer);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -465,6 +468,7 @@ export default function InboundsPage() {
           sniffing: sniffingString,
           shareAddrStrategy: dbInbound.shareAddrStrategy,
           shareAddr: dbInbound.shareAddr,
+          nodeId: dbInbound.nodeId ?? null,
         };
         const msg = await HttpUtil.post('/panel/api/inbounds/add', data);
         if (msg?.success) await refresh();
@@ -624,6 +628,7 @@ export default function InboundsPage() {
                       trafficDiff={trafficDiff}
                       pageSize={pageSize}
                       isMobile={isMobile}
+                      allowGlobalActions={!isCustomer}
                       subEnable={subSettings.enable}
                       nodesById={nodesById}
                       hasActiveNode={showNodeInfo}
@@ -649,6 +654,7 @@ export default function InboundsPage() {
             dbInbounds={dbInbounds}
             availableNodes={nodesList}
             availableNodesFetched={nodesFetched}
+            requireNode={isCustomer}
           />
         </LazyMount>
         <LazyMount when={infoOpen}>

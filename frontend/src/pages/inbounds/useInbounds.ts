@@ -8,6 +8,7 @@ import { Protocols } from '@/schemas/primitives';
 import { isSSMultiUser } from '@/lib/xray/protocol-capabilities';
 import { setDatepicker } from '@/hooks/useDatepicker';
 import { keys } from '@/api/queryKeys';
+import { useAccount } from '@/api/account';
 import { SlimInboundListSchema, LastOnlineMapSchema, InboundDetailSchema } from '@/schemas/inbound';
 import { OnlinesSchema, OnlineByNodeSchema, ActiveInboundsByNodeSchema } from '@/schemas/client';
 import { DefaultsPayloadSchema, type DefaultsPayload } from '@/schemas/defaults';
@@ -125,35 +126,42 @@ async function fetchDefaultSettings(): Promise<DefaultsPayload> {
 
 export function useInbounds() {
   const queryClient = useQueryClient();
+  const { account } = useAccount();
+  const customerPollInterval = account?.role === 'customer' ? 5_000 : false;
 
   const slimQuery = useQuery({
     queryKey: keys.inbounds.slim(),
     queryFn: fetchSlimInbounds,
     staleTime: Infinity,
+    refetchInterval: customerPollInterval,
   });
 
   const onlinesQuery = useQuery({
     queryKey: keys.clients.onlines(),
     queryFn: fetchOnlineClients,
     staleTime: Infinity,
+    refetchInterval: customerPollInterval,
   });
 
   const onlinesByGuidQuery = useQuery({
     queryKey: keys.clients.onlinesByGuid(),
     queryFn: fetchOnlineClientsByGuid,
     staleTime: Infinity,
+    refetchInterval: customerPollInterval,
   });
 
   const activeInboundsQuery = useQuery({
     queryKey: keys.clients.activeInbounds(),
     queryFn: fetchActiveInboundsByNode,
     staleTime: Infinity,
+    refetchInterval: customerPollInterval,
   });
 
   const lastOnlineQuery = useQuery({
     queryKey: keys.clients.lastOnline(),
     queryFn: fetchLastOnlineMap,
     staleTime: Infinity,
+    refetchInterval: customerPollInterval,
   });
 
   const defaultsQuery = useQuery({

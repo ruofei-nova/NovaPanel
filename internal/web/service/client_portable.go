@@ -59,6 +59,28 @@ func (s *ClientService) ExportAll() ([]ClientCreatePayload, error) {
 	return out, nil
 }
 
+func (s *ClientService) ExportForUser(userID int) ([]ClientCreatePayload, error) {
+	all, err := s.ExportAll()
+	if err != nil {
+		return nil, err
+	}
+	emails, err := (&TenantScopeService{}).OwnedClientEmails(userID)
+	if err != nil {
+		return nil, err
+	}
+	allowed := make(map[string]struct{}, len(emails))
+	for _, email := range emails {
+		allowed[email] = struct{}{}
+	}
+	out := make([]ClientCreatePayload, 0, len(allowed))
+	for _, item := range all {
+		if _, ok := allowed[item.Client.Email]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
 // ImportClients recreates clients from an exported list. Items that carry
 // inboundIds go through the normal BulkCreate path (added to every inbound and
 // pushed to xray); items with no inboundIds are restored as bare records so an

@@ -10,8 +10,9 @@ import (
 )
 
 type GroupController struct {
-	clientService service.ClientService
-	xrayService   service.XrayService
+	clientService  service.ClientService
+	inboundService service.InboundService
+	xrayService    service.XrayService
 }
 
 func NewGroupController(g *gin.RouterGroup) *GroupController {
@@ -32,7 +33,15 @@ func (a *GroupController) initRouter(g *gin.RouterGroup) {
 }
 
 func (a *GroupController) list(c *gin.Context) {
-	rows, err := a.clientService.ListGroups()
+	var (
+		rows []service.GroupSummary
+		err  error
+	)
+	if user, customer := customerUser(c); customer {
+		rows, err = a.clientService.ListGroupsForUser(user.Id)
+	} else {
+		rows, err = a.clientService.ListGroups()
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
@@ -42,7 +51,15 @@ func (a *GroupController) list(c *gin.Context) {
 
 func (a *GroupController) emails(c *gin.Context) {
 	name := c.Param("name")
-	emails, err := a.clientService.EmailsByGroup(name)
+	var (
+		emails []string
+		err    error
+	)
+	if user, customer := customerUser(c); customer {
+		emails, err = a.clientService.EmailsByGroupForUser(user.Id, name)
+	} else {
+		emails, err = a.clientService.EmailsByGroup(name)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
@@ -60,7 +77,13 @@ func (a *GroupController) create(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	if err := a.clientService.CreateGroup(body.Name); err != nil {
+	var err error
+	if user, customer := customerUser(c); customer {
+		err = a.clientService.CreateGroupForUser(user.Id, body.Name)
+	} else {
+		err = a.clientService.CreateGroup(body.Name)
+	}
+	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
@@ -79,12 +102,40 @@ func (a *GroupController) rename(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.RenameGroup(body.OldName, body.NewName)
+	var (
+		affected int
+		err      error
+	)
+	if user, customer := customerUser(c); customer {
+		emails, listErr := a.clientService.EmailsByGroupForUser(user.Id, body.OldName)
+		if listErr != nil {
+			err = listErr
+		} else {
+			stored, storedErr := a.clientService.HasStoredGroupForUser(user.Id, body.OldName)
+			if storedErr != nil {
+				err = storedErr
+			} else if len(emails) == 0 && !stored {
+				tenantNotFound(c, nil)
+				return
+			} else {
+				if len(emails) > 0 {
+					affected, err = a.clientService.AddToGroupForUser(user.Id, emails, body.NewName)
+					if err == nil && stored && body.OldName != body.NewName {
+						err = a.clientService.DeleteStoredGroupForUser(user.Id, body.OldName)
+					}
+				} else if stored {
+					err = a.clientService.RenameStoredGroupForUser(user.Id, body.OldName, body.NewName)
+				}
+			}
+		}
+	} else {
+		affected, err = a.clientService.RenameGroup(body.OldName, body.NewName)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	a.xrayService.SetToNeedRestart()
+	markCentralXrayRestart(c, &a.xrayService)
 	jsonObj(c, gin.H{"affected": affected}, nil)
 	notifyClientsChanged()
 }
@@ -99,12 +150,38 @@ func (a *GroupController) delete(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.DeleteGroup(body.Name)
+	var (
+		affected int
+		err      error
+	)
+	if user, customer := customerUser(c); customer {
+		emails, listErr := a.clientService.EmailsByGroupForUser(user.Id, body.Name)
+		if listErr != nil {
+			err = listErr
+		} else {
+			stored, storedErr := a.clientService.HasStoredGroupForUser(user.Id, body.Name)
+			if storedErr != nil {
+				err = storedErr
+			} else if len(emails) == 0 && !stored {
+				tenantNotFound(c, nil)
+				return
+			} else {
+				if len(emails) > 0 {
+					affected, err = a.clientService.AddToGroupForUser(user.Id, emails, "")
+				}
+				if err == nil && stored {
+					err = a.clientService.DeleteStoredGroupForUser(user.Id, body.Name)
+				}
+			}
+		}
+	} else {
+		affected, err = a.clientService.DeleteGroup(body.Name)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	a.xrayService.SetToNeedRestart()
+	markCentralXrayRestart(c, &a.xrayService)
 	jsonObj(c, gin.H{"affected": affected}, nil)
 	notifyClientsChanged()
 }
@@ -119,7 +196,21 @@ func (a *GroupController) resetTraffic(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	if err := a.clientService.ResetGroupTraffic(body.Name); err != nil {
+	var err error
+	if user, customer := customerUser(c); customer {
+		emails, listErr := a.clientService.EmailsByGroupForUser(user.Id, body.Name)
+		if listErr != nil {
+			err = listErr
+		} else if len(emails) == 0 {
+			tenantNotFound(c, nil)
+			return
+		} else {
+			_, err = a.clientService.BulkResetTraffic(&a.inboundService, emails)
+		}
+	} else {
+		err = a.clientService.ResetGroupTraffic(body.Name)
+	}
+	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
@@ -142,13 +233,21 @@ func (a *GroupController) bulkAdd(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), common.NewError("group name is required"))
 		return
 	}
-	affected, err := a.clientService.AddToGroup(req.Emails, req.Group)
+	var (
+		affected int
+		err      error
+	)
+	if user, customer := customerUser(c); customer {
+		affected, err = a.clientService.AddToGroupForUser(user.Id, req.Emails, req.Group)
+	} else {
+		affected, err = a.clientService.AddToGroup(req.Emails, req.Group)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
 	jsonObj(c, gin.H{"affected": affected}, nil)
-	a.xrayService.SetToNeedRestart()
+	markCentralXrayRestart(c, &a.xrayService)
 	notifyClientsChanged()
 }
 
@@ -162,12 +261,20 @@ func (a *GroupController) bulkRemove(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.RemoveFromGroup(req.Emails)
+	var (
+		affected int
+		err      error
+	)
+	if user, customer := customerUser(c); customer {
+		affected, err = a.clientService.AddToGroupForUser(user.Id, req.Emails, "")
+	} else {
+		affected, err = a.clientService.RemoveFromGroup(req.Emails)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
 	jsonObj(c, gin.H{"affected": affected}, nil)
-	a.xrayService.SetToNeedRestart()
+	markCentralXrayRestart(c, &a.xrayService)
 	notifyClientsChanged()
 }

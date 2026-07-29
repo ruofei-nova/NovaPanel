@@ -432,6 +432,9 @@ func (s *NodeService) Create(n *model.Node) error {
 		return err
 	}
 	db := database.GetDB()
+	if err := validateNodeOwner(db, n.OwnerUserID); err != nil {
+		return err
+	}
 	return db.Create(n).Error
 }
 
@@ -459,6 +462,9 @@ func (s *NodeService) Update(id int, in *model.Node) error {
 	if err := db.Where("id = ?", id).First(existing).Error; err != nil {
 		return err
 	}
+	if err := validateNodeOwner(db, in.OwnerUserID); err != nil {
+		return err
+	}
 	updates := map[string]any{
 		"name":                  in.Name,
 		"remark":                in.Remark,
@@ -481,7 +487,13 @@ func (s *NodeService) Update(id int, in *model.Node) error {
 		"longitude":             in.Longitude,
 	}
 	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := validateNodeOwnerTransition(tx, id, existing.OwnerUserID, in.OwnerUserID); err != nil {
+			return err
+		}
 		if err := tx.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+			return err
+		}
+		if err := assignNodeInboundsToOwner(tx, id, in.OwnerUserID); err != nil {
 			return err
 		}
 		return s.MarkNodeDirtyTx(tx, id)
@@ -511,6 +523,12 @@ func (s *NodeService) UpdateFromRequest(id int, req *NodeMutationRequest) error 
 	if err := db.Where("id = ?", id).First(existing).Error; err != nil {
 		return err
 	}
+	if !req.ownerUserIDWasSet() {
+		in.OwnerUserID = existing.OwnerUserID
+	}
+	if err := validateNodeOwner(db, in.OwnerUserID); err != nil {
+		return err
+	}
 	apiToken := existing.ApiToken
 	switch {
 	case req.ClearApiToken:
@@ -536,8 +554,21 @@ func (s *NodeService) UpdateFromRequest(id int, req *NodeMutationRequest) error 
 		"inbound_sync_mode":     in.InboundSyncMode,
 		"inbound_tags":          string(inboundTagsJSON),
 		"outbound_tag":          in.OutboundTag,
+		"owner_user_id":         in.OwnerUserID,
+		"country":               strings.TrimSpace(in.Country),
+		"city":                  strings.TrimSpace(in.City),
+		"latitude":              in.Latitude,
+		"longitude":             in.Longitude,
 	}
-	if err := db.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := validateNodeOwnerTransition(tx, id, existing.OwnerUserID, in.OwnerUserID); err != nil {
+			return err
+		}
+		if err := tx.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+			return err
+		}
+		return assignNodeInboundsToOwner(tx, id, in.OwnerUserID)
+	}); err != nil {
 		return err
 	}
 	if dErr := s.MarkNodeDirty(id); dErr != nil {
@@ -547,6 +578,100 @@ func (s *NodeService) UpdateFromRequest(id int, req *NodeMutationRequest) error 
 		mgr.InvalidateNode(id)
 	}
 	return nil
+}
+
+func validateNodeOwner(db *gorm.DB, ownerUserID *int) error {
+	if ownerUserID == nil {
+		return nil
+	}
+	if *ownerUserID <= 0 {
+		return common.NewError("assigned customer is invalid")
+	}
+	var count int64
+	if err := db.Model(&model.User{}).
+		Where("id = ? AND role = ? AND enabled = ?", *ownerUserID, "customer", true).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count != 1 {
+		return common.NewError("assigned customer does not exist or is disabled")
+	}
+	return nil
+}
+
+func validateNodeOwnerTransition(db *gorm.DB, nodeID int, current, next *int) error {
+	if (current == nil && next == nil) ||
+		(current != nil && next != nil && *current == *next) {
+		return nil
+	}
+
+	// A client attached both to this node and another node would become a
+	// mixed-tenant identity after reassignment. Require the administrator to
+	// detach that client first so credentials cannot cross tenant boundaries.
+	var sharedClients int64
+	if err := db.Raw(`
+		SELECT COUNT(DISTINCT local_links.client_id)
+		FROM client_inbounds local_links
+		JOIN inbounds local_inbound ON local_inbound.id = local_links.inbound_id
+		WHERE local_inbound.node_id = ?
+		  AND EXISTS (
+			SELECT 1
+			FROM client_inbounds other_links
+			JOIN inbounds other_inbound ON other_inbound.id = other_links.inbound_id
+			WHERE other_links.client_id = local_links.client_id
+			  AND (other_inbound.node_id IS NULL OR other_inbound.node_id <> ?)
+		  )
+	`, nodeID, nodeID).Scan(&sharedClients).Error; err != nil {
+		return err
+	}
+	if sharedClients > 0 {
+		return common.NewError("detach clients shared with other nodes before changing the assigned customer")
+	}
+
+	// Direct customer-to-customer transfer of a populated VPS would expose the
+	// previous customer's connection credentials. Empty the node first.
+	if current != nil && next != nil && *current != *next {
+		var clientCount int64
+		if err := db.Table("client_inbounds").
+			Joins("JOIN inbounds ON inbounds.id = client_inbounds.inbound_id").
+			Where("inbounds.node_id = ?", nodeID).
+			Distinct("client_inbounds.client_id").
+			Count(&clientCount).Error; err != nil {
+			return err
+		}
+		if clientCount > 0 {
+			return common.NewError("remove clients from the node before transferring it to another customer")
+		}
+	}
+	return nil
+}
+
+func firstAdminUserID(tx *gorm.DB) (int, error) {
+	var user model.User
+	if err := tx.Where("role = ?", "admin").Order("id asc").First(&user).Error; err != nil {
+		// Older databases can predate the role column's normalisation.  The
+		// first account remains the legacy administrator fallback.
+		if fallbackErr := tx.Order("id asc").First(&user).Error; fallbackErr != nil {
+			return 0, fallbackErr
+		}
+	}
+	return user.Id, nil
+}
+
+func assignNodeInboundsToOwner(tx *gorm.DB, nodeID int, ownerUserID *int) error {
+	userID := 0
+	if ownerUserID != nil {
+		userID = *ownerUserID
+	} else {
+		var err error
+		userID, err = firstAdminUserID(tx)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Model(&model.Inbound{}).
+		Where("node_id = ?", nodeID).
+		Update("user_id", userID).Error
 }
 
 func (s *NodeService) RuntimeNodeFromRequest(id int, req *NodeMutationRequest) (*model.Node, error) {
@@ -565,6 +690,9 @@ func (s *NodeService) RuntimeNodeFromRequest(id int, req *NodeMutationRequest) (
 	}
 	overlay := req.toNode()
 	overlay.Id = id
+	if id > 0 && !req.ownerUserIDWasSet() {
+		overlay.OwnerUserID = n.OwnerUserID
+	}
 	if req.ApiToken == nil {
 		overlay.ApiToken = n.ApiToken
 	}

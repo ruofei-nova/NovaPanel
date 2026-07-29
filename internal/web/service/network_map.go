@@ -133,13 +133,14 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 	}
 	guidToNode := make(map[string]int, len(nodes))
 	for _, node := range nodes {
+		attributionKey := effectiveNodeKey(node)
 		payload.Nodes = append(payload.Nodes, NetworkMapNode{
-			ID: node.Id, Guid: node.Guid, Name: node.Name, Status: node.Status,
+			ID: node.Id, Guid: attributionKey, Name: node.Name, Status: node.Status,
 			LatencyMs: node.LatencyMs, Latitude: node.Latitude,
 			Longitude: node.Longitude, OwnerUserID: node.OwnerUserID,
 		})
-		if node.Guid != "" {
-			guidToNode[node.Guid] = node.Id
+		if attributionKey != "" {
+			guidToNode[attributionKey] = node.Id
 		}
 	}
 	if len(guidToNode) == 0 {

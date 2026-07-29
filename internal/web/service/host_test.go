@@ -365,3 +365,111 @@ func TestUpdateHostGroup_ValidateBeforeDelete(t *testing.T) {
 		t.Fatalf("remark not updated: %s", got2.Remark)
 	}
 }
+
+func TestHostService_UserScopeHidesForeignAndMixedGroups(t *testing.T) {
+	setupBulkDB(t)
+	svc := &HostService{}
+
+	customerA := &model.User{Username: "host-customer-a", Role: "customer", Enabled: true}
+	customerB := &model.User{Username: "host-customer-b", Role: "customer", Enabled: true}
+	if err := database.GetDB().Create(customerA).Error; err != nil {
+		t.Fatalf("create customer A: %v", err)
+	}
+	if err := database.GetDB().Create(customerB).Error; err != nil {
+		t.Fatalf("create customer B: %v", err)
+	}
+
+	inboundA := &model.Inbound{
+		UserId:   customerA.Id,
+		Tag:      "host-tenant-a",
+		Enable:   false,
+		Port:     41001,
+		Protocol: model.VLESS,
+		Settings: `{"clients":[]}`,
+	}
+	inboundB := &model.Inbound{
+		UserId:   customerB.Id,
+		Tag:      "host-tenant-b",
+		Enable:   false,
+		Port:     41002,
+		Protocol: model.VLESS,
+		Settings: `{"clients":[]}`,
+	}
+	if err := database.GetDB().Create(inboundA).Error; err != nil {
+		t.Fatalf("create inbound A: %v", err)
+	}
+	if err := database.GetDB().Create(inboundB).Error; err != nil {
+		t.Fatalf("create inbound B: %v", err)
+	}
+
+	createdA, err := svc.AddHostGroup(&entity.HostGroup{
+		InboundIds: []int{inboundA.Id},
+		Remark:     "tenant-a",
+		Hosts:      []string{"a.example.com"},
+		Tags:       []string{"A-ONLY"},
+	})
+	if err != nil {
+		t.Fatalf("create tenant A group: %v", err)
+	}
+	createdB, err := svc.AddHostGroup(&entity.HostGroup{
+		InboundIds: []int{inboundB.Id},
+		Remark:     "tenant-b",
+		Hosts:      []string{"b.example.com"},
+		Tags:       []string{"B-ONLY"},
+	})
+	if err != nil {
+		t.Fatalf("create tenant B group: %v", err)
+	}
+
+	const mixedGroupID = "mixed-host-tenants"
+	for _, inboundID := range []int{inboundA.Id, inboundB.Id} {
+		if _, err := svc.AddHostGroup(&entity.HostGroup{
+			GroupId:    mixedGroupID,
+			InboundIds: []int{inboundID},
+			Remark:     "mixed",
+			Hosts:      []string{"mixed.example.com"},
+			Tags:       []string{"MIXED"},
+		}); err != nil {
+			t.Fatalf("create mixed group row for inbound %d: %v", inboundID, err)
+		}
+	}
+
+	groupsA, err := svc.GetHostsForUser(customerA.Id)
+	if err != nil {
+		t.Fatalf("GetHostsForUser(A): %v", err)
+	}
+	if len(groupsA) != 1 || groupsA[0].GroupId != createdA[0].GroupId {
+		t.Fatalf("customer A groups = %+v, want only %q", groupsA, createdA[0].GroupId)
+	}
+
+	groupsB, err := svc.GetHostsForUser(customerB.Id)
+	if err != nil {
+		t.Fatalf("GetHostsForUser(B): %v", err)
+	}
+	if len(groupsB) != 1 || groupsB[0].GroupId != createdB[0].GroupId {
+		t.Fatalf("customer B groups = %+v, want only %q", groupsB, createdB[0].GroupId)
+	}
+
+	if _, err := svc.GetHostGroupForUser(customerA.Id, createdB[0].GroupId); err == nil {
+		t.Fatalf("customer A must not read customer B's host group")
+	}
+	if _, err := svc.GetHostGroupForUser(customerA.Id, mixedGroupID); err == nil {
+		t.Fatalf("mixed-tenant host group must be hidden")
+	}
+
+	byInboundA, err := svc.GetHostsByInboundForUser(customerA.Id, inboundA.Id)
+	if err != nil {
+		t.Fatalf("GetHostsByInboundForUser(A): %v", err)
+	}
+	if len(byInboundA) != 1 || byInboundA[0].GroupId != createdA[0].GroupId {
+		t.Fatalf("customer A inbound groups = %+v, want only %q", byInboundA, createdA[0].GroupId)
+	}
+
+	tagsA, err := svc.GetAllTagsForUser(customerA.Id)
+	if err != nil {
+		t.Fatalf("GetAllTagsForUser(A): %v", err)
+	}
+	if len(tagsA) != 1 || tagsA[0] != "A-ONLY" {
+		t.Fatalf("customer A tags = %v, want [A-ONLY]", tagsA)
+	}
+}

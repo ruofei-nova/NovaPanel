@@ -216,6 +216,26 @@ func (s *InboundService) GetInboundsSlim(userId int) ([]*model.Inbound, error) {
 	return inbounds, nil
 }
 
+// GetAllInboundsSlim is the administrator variant of GetInboundsSlim. Customer
+// ownership is stored in user_id, so an administrator must not be limited to
+// the legacy first user's rows after nodes are delegated.
+func (s *InboundService) GetAllInboundsSlim() ([]*model.Inbound, error) {
+	db := database.GetDB()
+	var inbounds []*model.Inbound
+	err := db.Model(model.Inbound{}).Preload("ClientStats").Order("id ASC").Find(&inbounds).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	s.annotateFallbackParents(db, inbounds)
+	s.annotateLocalOriginGuid(inbounds)
+	s.backfillClientStats(db, inbounds)
+	s.overlayInboundsClientStats(db, inbounds)
+	for _, ib := range inbounds {
+		ib.Settings = slimSettingsClients(ib.Settings)
+	}
+	return inbounds, nil
+}
+
 // slimSettingsClients rewrites the inbound settings JSON so settings.clients[]
 // keeps only the fields the list view actually reads. Returns the input
 // unchanged when the JSON can't be parsed or has no clients array.
@@ -320,6 +340,14 @@ type InboundOption struct {
 }
 
 func (s *InboundService) GetInboundOptions(userId int) ([]InboundOption, error) {
+	return s.getInboundOptions(&userId)
+}
+
+func (s *InboundService) GetAllInboundOptions() ([]InboundOption, error) {
+	return s.getInboundOptions(nil)
+}
+
+func (s *InboundService) getInboundOptions(userId *int) ([]InboundOption, error) {
 	db := database.GetDB()
 	var rows []struct {
 		Id                int    `gorm:"column:id"`
@@ -336,12 +364,14 @@ func (s *InboundService) GetInboundOptions(userId int) ([]InboundOption, error) 
 		NodeId            *int   `gorm:"column:node_id"`
 		NodeAddress       string `gorm:"column:node_address"`
 	}
-	err := db.Table("inbounds").
+	query := db.Table("inbounds").
 		Select("inbounds.id, inbounds.remark, inbounds.tag, inbounds.protocol, inbounds.port, inbounds.enable, inbounds.stream_settings, inbounds.settings, inbounds.listen, inbounds.share_addr, inbounds.share_addr_strategy, inbounds.node_id, COALESCE(nodes.address, '') AS node_address").
 		Joins("LEFT JOIN nodes ON nodes.id = inbounds.node_id").
-		Where("inbounds.user_id = ?", userId).
-		Order("inbounds.id ASC").
-		Scan(&rows).Error
+		Order("inbounds.id ASC")
+	if userId != nil {
+		query = query.Where("inbounds.user_id = ?", *userId)
+	}
+	err := query.Scan(&rows).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -991,7 +1021,7 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 	if postCommitApply != nil {
 		postCommitApply()
 	}
-	if loadErr == nil && ib.Tag != "" {
+	if loadErr == nil && ib.NodeID == nil && ib.Tag != "" {
 		if routingChanged, syncErr := (&XraySettingService{}).RemoveInboundTagReferences(ib.Tag); syncErr != nil {
 			logger.Warning("DelInbound: sync routing on inbound delete failed:", syncErr)
 		} else if routingChanged {
@@ -1397,7 +1427,7 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 	// in xrayTemplateConfig at the new tag (oldInbound.Tag now holds the resolved
 	// new tag; tag holds the pre-edit one). Done post-commit so a sync failure
 	// can't roll back the inbound edit.
-	if tag != oldInbound.Tag {
+	if oldInbound.NodeID == nil && tag != oldInbound.Tag {
 		if routingChanged, syncErr := (&XraySettingService{}).PropagateInboundTagRename(tag, oldInbound.Tag); syncErr != nil {
 			logger.Warning("UpdateInbound: sync routing on tag rename failed:", syncErr)
 		} else if routingChanged {

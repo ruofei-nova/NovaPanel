@@ -5,6 +5,15 @@ import { AccountProvider, useAccount } from '@/api/account';
 import { useWebSocketBridge } from '@/api/websocketBridge';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
+const CUSTOMER_ROUTES = new Set([
+  '/',
+  '/inbounds',
+  '/clients',
+  '/groups',
+  '/hosts',
+  '/nodes',
+]);
+
 function AdminPanel() {
   useWebSocketBridge();
   usePageTitle();
@@ -16,7 +25,8 @@ function PanelAccess() {
   const location = useLocation();
   if (loading) return <Spin fullscreen />;
   if (account?.role === 'customer') {
-    if (location.pathname !== '/') return <Navigate to="/" replace />;
+    const pathname = location.pathname.replace(/\/+$/, '') || '/';
+    if (!CUSTOMER_ROUTES.has(pathname)) return <Navigate to="/" replace />;
     return <Outlet />;
   }
   return <AdminPanel />;

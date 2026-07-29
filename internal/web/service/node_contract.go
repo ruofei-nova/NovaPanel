@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -141,10 +142,33 @@ type NodeMutationRequest struct {
 	InboundTags         []string `json:"inboundTags" form:"inboundTags"`
 	OutboundTag         string   `json:"outboundTag" form:"outboundTag"`
 	OwnerUserID         *int     `json:"ownerUserId,omitempty" form:"ownerUserId"`
+	OwnerUserIDSet      bool     `json:"-" form:"-"`
 	Country             string   `json:"country,omitempty" form:"country"`
 	City                string   `json:"city,omitempty" form:"city"`
 	Latitude            float64  `json:"latitude,omitempty" form:"latitude"`
 	Longitude           float64  `json:"longitude,omitempty" form:"longitude"`
+}
+
+// UnmarshalJSON records whether ownerUserId was present so an older or partial
+// update request cannot silently clear an existing customer assignment. An
+// explicit JSON null remains the supported way to return a node to the admin.
+func (r *NodeMutationRequest) UnmarshalJSON(data []byte) error {
+	type requestAlias NodeMutationRequest
+	var value requestAlias
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = NodeMutationRequest(value)
+	_, r.OwnerUserIDSet = fields["ownerUserId"]
+	return nil
+}
+
+func (r *NodeMutationRequest) ownerUserIDWasSet() bool {
+	return r != nil && (r.OwnerUserIDSet || r.OwnerUserID != nil)
 }
 
 func (r *NodeMutationRequest) validateCredentials(create bool) error {

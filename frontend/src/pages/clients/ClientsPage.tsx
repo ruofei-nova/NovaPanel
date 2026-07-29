@@ -58,6 +58,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useClients } from '@/hooks/useClients';
 import { useNodesQuery } from '@/api/queries/useNodesQuery';
+import { useAccount } from '@/api/account';
 import { useDatepicker } from '@/hooks/useDatepicker';
 import type { ClientRecord, InboundOption, ExternalLink, ExternalLinkInput } from '@/hooks/useClients';
 import ClientTrafficCell from '@/components/clients/ClientTrafficCell';
@@ -196,6 +197,8 @@ function sortValueFor(column: string | null, order: 'ascend' | 'descend' | null)
 
 export default function ClientsPage() {
   const { t } = useTranslation();
+  const { account } = useAccount();
+  const isCustomer = account?.role === 'customer';
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { datepicker } = useDatepicker();
   const { isMobile } = useMediaQuery();
@@ -221,7 +224,7 @@ export default function ClientsPage() {
   useWebSocket({
     traffic: applyTrafficEvent,
     client_stats: applyClientStatsEvent,
-  });
+  }, !isCustomer);
 
   // Node list for the Nodes filter; the section only renders when the panel
   // actually manages nodes (#4997).
@@ -1148,27 +1151,29 @@ export default function ClientsPage() {
                                     label: t('pages.clients.importClients'),
                                     onClick: onImportClients,
                                   },
-                                  {
-                                    key: 'resetAll',
-                                    icon: <RetweetOutlined />,
-                                    label: t('pages.clients.resetAllTraffics'),
-                                    onClick: onResetAllTraffics,
-                                  },
-                                  { type: 'divider' as const },
-                                  {
-                                    key: 'delDepleted',
-                                    icon: <RestOutlined />,
-                                    label: t('pages.clients.delDepleted'),
-                                    danger: true,
-                                    onClick: onDelDepleted,
-                                  },
-                                  {
-                                    key: 'delOrphans',
-                                    icon: <DisconnectOutlined />,
-                                    label: t('pages.clients.delOrphans'),
-                                    danger: true,
-                                    onClick: onDeleteOrphans,
-                                  },
+                                  ...(!isCustomer ? [
+                                    {
+                                      key: 'resetAll',
+                                      icon: <RetweetOutlined />,
+                                      label: t('pages.clients.resetAllTraffics'),
+                                      onClick: onResetAllTraffics,
+                                    },
+                                    { type: 'divider' as const },
+                                    {
+                                      key: 'delDepleted',
+                                      icon: <RestOutlined />,
+                                      label: t('pages.clients.delDepleted'),
+                                      danger: true,
+                                      onClick: onDelDepleted,
+                                    },
+                                    {
+                                      key: 'delOrphans',
+                                      icon: <DisconnectOutlined />,
+                                      label: t('pages.clients.delOrphans'),
+                                      danger: true,
+                                      onClick: onDeleteOrphans,
+                                    },
+                                  ] : []),
                                 ],
                             }}
                           >

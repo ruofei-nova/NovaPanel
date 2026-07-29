@@ -30,6 +30,7 @@ import {
   ToolOutlined,
 } from '@ant-design/icons';
 
+import { useAccount } from '@/api/account';
 import { HttpUtil } from '@/utils';
 import { formatPanelVersion } from '@/lib/panel-version';
 import { pauseAnimationsUntilLeave, useTheme } from '@/hooks/useTheme';
@@ -39,6 +40,15 @@ import './AppSidebar.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'isSidebarCollapsed';
 const LOGOUT_KEY = '__logout__';
+const CUSTOMER_TAB_KEYS = new Set([
+  '/',
+  '/inbounds',
+  '/clients',
+  '/groups',
+  '/nodes',
+  '/hosts',
+  LOGOUT_KEY,
+]);
 
 type IconName = 'dashboard' | 'inbound' | 'team' | 'customers' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'logout' | 'apidocs' | 'outbound' | 'routing';
 
@@ -105,10 +115,12 @@ function ThemeCycleButton({ id, isDark, isUltra, onCycle, ariaLabel }: {
 
 export default function AppSidebar() {
   const { t } = useTranslation();
+  const { account } = useAccount();
+  const isCustomer = account?.role === 'customer';
   const { isDark, isUltra, toggleTheme, toggleUltra } = useTheme();
   const navigate = useNavigate();
   const { pathname, hash } = useLocation();
-  const { allSetting } = useAllSettings();
+  const { allSetting } = useAllSettings(!isCustomer);
   const showSubFormats = !!(allSetting.subJsonEnable || allSetting.subClashEnable);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
@@ -117,21 +129,24 @@ export default function AppSidebar() {
   const currentTheme: 'light' | 'dark' = isDark ? 'dark' : 'light';
   const panelVersion = window.X_UI_CUR_VER || '';
 
-  const tabs = useMemo<{ key: string; icon: IconName; title: string }[]>(() => [
-    { key: '/', icon: 'dashboard', title: t('menu.dashboard') },
-    { key: '/inbounds', icon: 'inbound', title: t('menu.inbounds') },
-    { key: '/clients', icon: 'team', title: t('menu.clients') },
-    { key: '/customers', icon: 'customers', title: '客户账号' },
-    { key: '/groups', icon: 'groups', title: t('menu.groups') },
-    { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
-    { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },
-    { key: '/outbound', icon: 'outbound', title: t('menu.outbounds') },
-    { key: '/routing', icon: 'routing', title: t('menu.routing') },
-    { key: '/settings', icon: 'setting', title: t('menu.settings') },
-    { key: '/xray', icon: 'tool', title: t('menu.xray') },
-    { key: '/api-docs', icon: 'apidocs', title: t('menu.apiDocs') },
-    { key: LOGOUT_KEY, icon: 'logout', title: t('logout') },
-  ], [t]);
+  const tabs = useMemo<{ key: string; icon: IconName; title: string }[]>(() => {
+    const allTabs: { key: string; icon: IconName; title: string }[] = [
+      { key: '/', icon: 'dashboard', title: t('menu.dashboard') },
+      { key: '/inbounds', icon: 'inbound', title: t('menu.inbounds') },
+      { key: '/clients', icon: 'team', title: t('menu.clients') },
+      { key: '/customers', icon: 'customers', title: '客户账号' },
+      { key: '/groups', icon: 'groups', title: t('menu.groups') },
+      { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
+      { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },
+      { key: '/outbound', icon: 'outbound', title: t('menu.outbounds') },
+      { key: '/routing', icon: 'routing', title: t('menu.routing') },
+      { key: '/settings', icon: 'setting', title: t('menu.settings') },
+      { key: '/xray', icon: 'tool', title: t('menu.xray') },
+      { key: '/api-docs', icon: 'apidocs', title: t('menu.apiDocs') },
+      { key: LOGOUT_KEY, icon: 'logout', title: t('logout') },
+    ];
+    return isCustomer ? allTabs.filter((tab) => CUSTOMER_TAB_KEYS.has(tab.key)) : allTabs;
+  }, [isCustomer, t]);
 
   const navItems = useMemo(() => tabs.filter((tab) => tab.icon !== 'logout'), [tabs]);
   const utilItems = useMemo(() => tabs.filter((tab) => tab.icon === 'logout'), [tabs]);

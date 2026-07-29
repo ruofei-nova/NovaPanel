@@ -44,6 +44,7 @@ export default function InboundList({
   trafficDiff,
   pageSize,
   isMobile,
+  allowGlobalActions = true,
   subEnable,
   nodesById,
   hasActiveNode,
@@ -161,7 +162,9 @@ export default function InboundList({
       ...(subEnable
         ? [{ key: 'subs', icon: <ExportOutlined />, label: `${t('pages.inbounds.export')} — ${t('pages.settings.subSettings')}` }]
         : []),
-      { key: 'resetInbounds', icon: <ReloadOutlined />, label: t('pages.inbounds.resetAllTraffic') },
+      ...(allowGlobalActions
+        ? [{ key: 'resetInbounds', icon: <ReloadOutlined />, label: t('pages.inbounds.resetAllTraffic') }]
+        : []),
     ],
     onClick: ({ key }) => onGeneralAction(key as GeneralAction),
   };

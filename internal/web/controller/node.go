@@ -82,6 +82,15 @@ func (a *NodeController) list(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.list"), err)
 		return
 	}
+	if user, customer := customerUser(c); customer {
+		filtered := make([]*service.NodeView, 0, len(nodes))
+		for _, node := range nodes {
+			if node.OwnerUserID != nil && *node.OwnerUserID == user.Id {
+				filtered = append(filtered, node)
+			}
+		}
+		nodes = filtered
+	}
 	jsonObj(c, nodes, nil)
 }
 
@@ -89,6 +98,9 @@ func (a *NodeController) get(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if !requireOwnedNode(c, id) {
 		return
 	}
 	n, err := a.nodeService.GetViewById(id)
@@ -105,6 +117,9 @@ func (a *NodeController) webCert(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if !requireOwnedNode(c, id) {
 		return
 	}
 	files, err := a.nodeService.GetWebCertFiles(id)
@@ -339,6 +354,9 @@ func (a *NodeController) history(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if !requireOwnedNode(c, id) {
 		return
 	}
 	metric := c.Param("metric")

@@ -862,12 +862,13 @@ type ClientRecord struct {
 func (ClientRecord) TableName() string { return "clients" }
 
 type ClientGroup struct {
-	Id        int    `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name      string `json:"name" gorm:"uniqueIndex;not null"`
-	ResetUp   int64  `json:"resetUp" gorm:"column:reset_up;default:0"`
-	ResetDown int64  `json:"resetDown" gorm:"column:reset_down;default:0"`
-	CreatedAt int64  `json:"createdAt" gorm:"autoCreateTime:milli"`
-	UpdatedAt int64  `json:"updatedAt" gorm:"autoUpdateTime:milli"`
+	Id          int    `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerUserID *int   `json:"ownerUserId,omitempty" gorm:"column:owner_user_id;index"`
+	Name        string `json:"name" gorm:"uniqueIndex;not null"`
+	ResetUp     int64  `json:"resetUp" gorm:"column:reset_up;default:0"`
+	ResetDown   int64  `json:"resetDown" gorm:"column:reset_down;default:0"`
+	CreatedAt   int64  `json:"createdAt" gorm:"autoCreateTime:milli"`
+	UpdatedAt   int64  `json:"updatedAt" gorm:"autoUpdateTime:milli"`
 }
 
 func (ClientGroup) TableName() string { return "client_groups" }

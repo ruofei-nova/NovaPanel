@@ -79,8 +79,47 @@ func (a *APIController) checkAPIAuth(c *gin.Context) {
 }
 
 func customerAllowedAPIPath(path string) bool {
-	return strings.HasSuffix(path, "/panel/api/account/me") ||
-		strings.HasSuffix(path, "/panel/api/network/map")
+	marker := "/panel/api/"
+	index := strings.LastIndex(path, marker)
+	if index < 0 {
+		return false
+	}
+	relative := strings.Trim(strings.TrimSpace(path[index+len(marker):]), "/")
+	switch relative {
+	case "account/me",
+		"network/map",
+		"setting/defaultSettings",
+		"setting/validateRegex",
+		"server/getNewUUID",
+		"server/getNewX25519Cert",
+		"server/getNewmldsa65",
+		"server/getNewmlkem768",
+		"server/getNewVlessEnc",
+		"server/getNewEchCert",
+		"server/getCertHash",
+		"server/getRemoteCertHash",
+		"server/scanRealityTarget",
+		"server/scanRealityTargets":
+		return true
+	}
+	if strings.HasPrefix(relative, "inbounds/") {
+		return relative != "inbounds/pushClientTraffics"
+	}
+	if strings.HasPrefix(relative, "clients/") {
+		switch relative {
+		case "clients/resetAllTraffics", "clients/delOrphans", "clients/delDepleted", "clients/clientIpsByGuid":
+			return false
+		default:
+			return true
+		}
+	}
+	if strings.HasPrefix(relative, "hosts/") {
+		return true
+	}
+	return relative == "nodes/list" ||
+		strings.HasPrefix(relative, "nodes/get/") ||
+		strings.HasPrefix(relative, "nodes/history/") ||
+		strings.HasPrefix(relative, "nodes/webCert/")
 }
 
 // initRouter sets up the API routes for inbounds, server, and other endpoints.

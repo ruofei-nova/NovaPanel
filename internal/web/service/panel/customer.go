@@ -101,8 +101,23 @@ func (s *CustomerService) ResetPassword(id int) (string, error) {
 
 func (s *CustomerService) Delete(id int) error {
 	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		var admin model.User
+		if err := tx.Where("role = ?", UserRoleAdmin).Order("id asc").First(&admin).Error; err != nil {
+			if fallbackErr := tx.Order("id asc").First(&admin).Error; fallbackErr != nil {
+				return fallbackErr
+			}
+		}
+		// Recover every inbound owned by the departing customer, including
+		// legacy or manually-created rows that are not attached to a node.
+		if err := tx.Model(&model.Inbound{}).Where("user_id = ?", id).
+			Update("user_id", admin.Id).Error; err != nil {
+			return err
+		}
 		if err := tx.Model(&model.Node{}).Where("owner_user_id = ?", id).
 			Update("owner_user_id", nil).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("owner_user_id = ?", id).Delete(&model.ClientGroup{}).Error; err != nil {
 			return err
 		}
 		result := tx.Where("id = ? AND role = ?", id, UserRoleCustomer).Delete(&model.User{})

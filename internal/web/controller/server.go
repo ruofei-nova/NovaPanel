@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -20,6 +22,30 @@ import (
 )
 
 var filenameRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+
+var customerRealityScans = struct {
+	sync.Mutex
+	next map[int]time.Time
+}{next: make(map[int]time.Time)}
+
+func allowCustomerRealityScan(c *gin.Context) bool {
+	user, customer := customerUser(c)
+	if !customer {
+		return true
+	}
+	now := time.Now()
+	customerRealityScans.Lock()
+	defer customerRealityScans.Unlock()
+	if next := customerRealityScans.next[user.Id]; now.Before(next) {
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+			"success": false,
+			"msg":     "please wait before starting another network scan",
+		})
+		return false
+	}
+	customerRealityScans.next[user.Id] = now.Add(15 * time.Second)
+	return true
+}
 
 // ServerController handles server management and status-related operations.
 type ServerController struct {
@@ -441,7 +467,15 @@ func (a *ServerController) getNewEchCert(c *gin.Context) {
 // getCertHash returns the hex SHA-256 of the given certificate (file path or
 // inline content) so the panel can fill the pinned-cert field.
 func (a *ServerController) getCertHash(c *gin.Context) {
-	hashes, err := a.serverService.GetCertHash(c.PostForm("certFile"), c.PostForm("certContent"))
+	certFile := c.PostForm("certFile")
+	if _, customer := customerUser(c); customer && certFile != "" {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"msg":     "customer accounts may hash inline certificate content only",
+		})
+		return
+	}
+	hashes, err := a.serverService.GetCertHash(certFile, c.PostForm("certContent"))
 	if err != nil {
 		jsonMsg(c, "get cert hash", err)
 		return
@@ -452,7 +486,15 @@ func (a *ServerController) getCertHash(c *gin.Context) {
 // getRemoteCertHash runs `xray tls ping` against the given server and returns
 // its live certificate SHA-256 hash(es) for pinning.
 func (a *ServerController) getRemoteCertHash(c *gin.Context) {
-	hashes, err := a.serverService.GetRemoteCertHash(c.PostForm("server"))
+	var (
+		hashes []string
+		err    error
+	)
+	if _, customer := customerUser(c); customer {
+		hashes, err = a.serverService.GetPublicRemoteCertHash(c.PostForm("server"))
+	} else {
+		hashes, err = a.serverService.GetRemoteCertHash(c.PostForm("server"))
+	}
 	if err != nil {
 		jsonMsg(c, "get remote cert hash", err)
 		return
@@ -463,6 +505,9 @@ func (a *ServerController) getRemoteCertHash(c *gin.Context) {
 // scanRealityTarget runs a live TLS 1.3 probe against the candidate REALITY
 // target and returns a structured feasibility verdict plus the cert SAN names.
 func (a *ServerController) scanRealityTarget(c *gin.Context) {
+	if !allowCustomerRealityScan(c) {
+		return
+	}
 	xver, _ := strconv.Atoi(c.PostForm("xver"))
 	res, err := a.serverService.ScanRealityTarget(c.PostForm("target"), xver)
 	if err != nil {
@@ -476,7 +521,28 @@ func (a *ServerController) scanRealityTarget(c *gin.Context) {
 // comma-separated list, or the built-in seed set when empty) and returns each
 // verdict ranked by feasibility then latency.
 func (a *ServerController) scanRealityTargets(c *gin.Context) {
-	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"))
+	targets := c.PostForm("targets")
+	if _, customer := customerUser(c); customer {
+		count := 0
+		for raw := range strings.SplitSeq(targets, ",") {
+			target := strings.TrimSpace(raw)
+			if target == "" {
+				continue
+			}
+			count++
+			if strings.Contains(target, "/") || count > 16 {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+					"success": false,
+					"msg":     "customer scans accept at most 16 host targets and do not accept CIDR ranges",
+				})
+				return
+			}
+		}
+	}
+	if !allowCustomerRealityScan(c) {
+		return
+	}
+	res, err := a.serverService.ScanRealityTargets(targets)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.scanRealityTargetError"), err)
 		return

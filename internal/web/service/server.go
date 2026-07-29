@@ -33,6 +33,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
+	"github.com/mhsanaei/3x-ui/v3/internal/util/netsafe"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/sys"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
@@ -2116,6 +2117,7 @@ func (s *ServerService) GetNewmldsa65() (any, error) {
 // pinned-cert field from the inbound's own certificate without the user
 // computing the hash by hand.
 func (s *ServerService) GetCertHash(certFile string, certContent string) ([]string, error) {
+	const maxCertificateBytes = 1 << 20
 	var certBytes []byte
 	if path := strings.TrimSpace(certFile); path != "" {
 		// Guard against path traversal: only hash certificate files the panel
@@ -2127,13 +2129,33 @@ func (s *ServerService) GetCertHash(certFile string, certContent string) ([]stri
 		if !ok {
 			return nil, common.NewError("certificate file is not referenced by any inbound or panel setting")
 		}
-		b, err := os.ReadFile(known)
+		file, err := os.Open(known)
 		if err != nil {
 			return nil, err
 		}
-		certBytes = b
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, common.NewError("certificate path is not a regular file")
+		}
+		if info.Size() > maxCertificateBytes {
+			return nil, common.NewError("certificate file exceeds size limit")
+		}
+		certBytes, err = io.ReadAll(io.LimitReader(file, maxCertificateBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(certBytes) > maxCertificateBytes {
+			return nil, common.NewError("certificate file exceeds size limit")
+		}
 	} else if strings.TrimSpace(certContent) != "" {
 		certBytes = []byte(certContent)
+		if len(certBytes) > maxCertificateBytes {
+			return nil, common.NewError("certificate content exceeds size limit")
+		}
 	} else {
 		return nil, common.NewError("no certificate provided")
 	}
@@ -2250,6 +2272,18 @@ func walkCertFiles(node any, out []string) []string {
 // real dial/handshake failure (connection refused, timeout, …) surfaces
 // verbatim. `server` may be host or host:port; the port defaults to 443.
 func (s *ServerService) GetRemoteCertHash(server string) ([]string, error) {
+	ctx := netsafe.ContextWithAllowPrivate(context.Background(), true)
+	return s.getRemoteCertHash(ctx, server)
+}
+
+// GetPublicRemoteCertHash is the delegated-customer variant. It keeps the
+// certificate helper useful for public CDN/REALITY targets while preventing a
+// customer from using the central panel as a private-network port scanner.
+func (s *ServerService) GetPublicRemoteCertHash(server string) ([]string, error) {
+	return s.getRemoteCertHash(context.Background(), server)
+}
+
+func (s *ServerService) getRemoteCertHash(ctx context.Context, server string) ([]string, error) {
 	server = strings.TrimSpace(server)
 	if server == "" {
 		return nil, common.NewError("no server provided")
@@ -2260,8 +2294,7 @@ func (s *ServerService) GetRemoteCertHash(server string) ([]string, error) {
 		host, port = h, p
 	}
 
-	dialer := stdnet.Dialer{Timeout: 10 * time.Second}
-	tcpConn, err := dialer.Dial("tcp", stdnet.JoinHostPort(host, port))
+	tcpConn, err := netsafe.SSRFGuardedDialContext(ctx, "tcp", stdnet.JoinHostPort(host, port))
 	if err != nil {
 		return nil, common.NewErrorf("failed to dial %s: %s", stdnet.JoinHostPort(host, port), err)
 	}

@@ -14,6 +14,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNodesQuery } from '@/api/queries/useNodesQuery';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import { useNodeMutations } from '@/api/queries/useNodeMutations';
+import { useAccount } from '@/api/account';
 import AppSidebar from '@/layouts/AppSidebar';
 import NodeList from './NodeList';
 import NodeFormModal from './NodeFormModal';
@@ -50,6 +51,8 @@ function UpdateChannelChoice({ onChange }: { onChange: (dev: boolean) => void })
 
 export default function NodesPage() {
   const { t } = useTranslation();
+  const { account } = useAccount();
+  const readOnly = account?.role === 'customer';
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { isMobile } = useMediaQuery();
   const [modal, modalContextHolder] = Modal.useModal();
@@ -66,6 +69,7 @@ export default function NodesPage() {
       return msg?.obj?.latestVersion || '';
     },
     staleTime: 5 * 60 * 1000,
+    enabled: !readOnly,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -278,6 +282,7 @@ export default function NodesPage() {
 
                   <Col span={24}>
                     <NodeList
+                      readOnly={readOnly}
                       nodes={nodes}
                       loading={loading}
                       isMobile={isMobile}
@@ -300,48 +305,52 @@ export default function NodesPage() {
           </Layout.Content>
         </Layout>
 
-        <NodeFormModal
-          open={formOpen}
-          mode={formMode}
-          node={formNode}
-          testConnection={testConnection}
-          fetchFingerprint={fetchFingerprint}
-          fetchInbounds={fetchInbounds}
-          save={onSave}
-          onOpenChange={setFormOpen}
-        />
+        {!readOnly && (
+          <>
+            <NodeFormModal
+              open={formOpen}
+              mode={formMode}
+              node={formNode}
+              testConnection={testConnection}
+              fetchFingerprint={fetchFingerprint}
+              fetchInbounds={fetchInbounds}
+              save={onSave}
+              onOpenChange={setFormOpen}
+            />
 
-        <Modal
-          open={mtlsOpen}
-          title={t('pages.nodes.mtls.title')}
-          footer={null}
-          onCancel={() => setMtlsOpen(false)}
-          destroyOnHidden
-        >
-          <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-            {t('pages.nodes.mtls.intro')}
-          </Typography.Paragraph>
-          <Button onClick={onCopyNodeCa} loading={copyingCa} style={{ marginBottom: 4 }}>
-            {t('pages.nodes.mtls.copyCa')}
-          </Button>
-          <Typography.Paragraph type="secondary">
-            {t('pages.nodes.mtls.copyCaHint')}
-          </Typography.Paragraph>
-          <Typography.Text strong>{t('pages.nodes.mtls.trustLabel')}</Typography.Text>
-          <Input.TextArea
-            rows={5}
-            value={trustCa}
-            onChange={(e) => setTrustCa(e.target.value)}
-            placeholder={t('pages.nodes.mtls.trustPlaceholder')}
-            style={{ marginTop: 4, fontFamily: 'monospace' }}
-          />
-          <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-            {t('pages.nodes.mtls.trustHint')}
-          </Typography.Paragraph>
-          <Button type="primary" onClick={onSaveTrustCa} loading={savingTrustCa} block>
-            {t('pages.nodes.mtls.save')}
-          </Button>
-        </Modal>
+            <Modal
+              open={mtlsOpen}
+              title={t('pages.nodes.mtls.title')}
+              footer={null}
+              onCancel={() => setMtlsOpen(false)}
+              destroyOnHidden
+            >
+              <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+                {t('pages.nodes.mtls.intro')}
+              </Typography.Paragraph>
+              <Button onClick={onCopyNodeCa} loading={copyingCa} style={{ marginBottom: 4 }}>
+                {t('pages.nodes.mtls.copyCa')}
+              </Button>
+              <Typography.Paragraph type="secondary">
+                {t('pages.nodes.mtls.copyCaHint')}
+              </Typography.Paragraph>
+              <Typography.Text strong>{t('pages.nodes.mtls.trustLabel')}</Typography.Text>
+              <Input.TextArea
+                rows={5}
+                value={trustCa}
+                onChange={(e) => setTrustCa(e.target.value)}
+                placeholder={t('pages.nodes.mtls.trustPlaceholder')}
+                style={{ marginTop: 4, fontFamily: 'monospace' }}
+              />
+              <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
+                {t('pages.nodes.mtls.trustHint')}
+              </Typography.Paragraph>
+              <Button type="primary" onClick={onSaveTrustCa} loading={savingTrustCa} block>
+                {t('pages.nodes.mtls.save')}
+              </Button>
+            </Modal>
+          </>
+        )}
       </Layout>
     </ConfigProvider>
   );

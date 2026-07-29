@@ -350,7 +350,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	// origin (an inbound the node forwards from its own sub-node) is kept as-is,
 	// so a chained Node1->Node2->Node3 still attributes Node3's inbounds to Node3.
 	var nodeRow model.Node
-	db.Select("guid").Where("id = ?", nodeID).First(&nodeRow)
+	db.Select("guid", "owner_user_id").Where("id = ?", nodeID).First(&nodeRow)
 	selfKey := effectiveNodeKey(&model.Node{Id: nodeID, Guid: nodeRow.Guid})
 	guidShared := nodeRow.Guid != "" && selfKey != nodeRow.Guid
 	originGuidFor := func(snapIb *model.Inbound) string {
@@ -417,11 +417,15 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	}
 
 	var defaultUserId int
-	if len(central) > 0 {
+	if nodeRow.OwnerUserID != nil && *nodeRow.OwnerUserID > 0 {
+		defaultUserId = *nodeRow.OwnerUserID
+	} else if len(central) > 0 {
 		defaultUserId = central[0].UserId
 	} else {
 		var u model.User
-		if err := db.Model(model.User{}).Order("id asc").First(&u).Error; err == nil {
+		if err := db.Model(model.User{}).Where("role = ?", "admin").Order("id asc").First(&u).Error; err == nil {
+			defaultUserId = u.Id
+		} else if err := db.Model(model.User{}).Order("id asc").First(&u).Error; err == nil {
 			defaultUserId = u.Id
 		} else {
 			defaultUserId = 1

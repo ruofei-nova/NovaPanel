@@ -73,6 +73,7 @@ export interface InboundListProps {
   trafficDiff: number;
   pageSize: number;
   isMobile: boolean;
+  allowGlobalActions?: boolean;
   subEnable: boolean;
   nodesById: Map<number, NodeRecord>;
   hasActiveNode: boolean;

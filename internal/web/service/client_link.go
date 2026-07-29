@@ -5,6 +5,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 
 	"gorm.io/gorm"
 )
@@ -73,10 +74,6 @@ func (s *ClientService) SyncInbound(tx *gorm.DB, inboundId int, clients []model.
 		tx = database.GetDB()
 	}
 
-	if err := tx.Where("inbound_id = ?", inboundId).Delete(&model.ClientInbound{}).Error; err != nil {
-		return err
-	}
-
 	emails := make([]string, 0, len(clients))
 	seen := make(map[string]struct{}, len(clients))
 	for i := range clients {
@@ -103,6 +100,29 @@ func (s *ClientService) SyncInbound(tx *gorm.DB, inboundId int, clients []model.
 			r := rows[i]
 			existing[r.Email] = &r
 		}
+	}
+
+	if len(emails) > 0 {
+		var inbound model.Inbound
+		if err := tx.Select("id", "user_id").First(&inbound, inboundId).Error; err != nil {
+			return err
+		}
+		var conflicts int64
+		if err := tx.Table("client_inbounds AS tenant_links").
+			Joins("JOIN clients AS tenant_clients ON tenant_clients.id = tenant_links.client_id").
+			Joins("JOIN inbounds AS tenant_inbounds ON tenant_inbounds.id = tenant_links.inbound_id").
+			Where("tenant_clients.email IN ? AND tenant_links.inbound_id <> ? AND tenant_inbounds.user_id <> ?",
+				emails, inboundId, inbound.UserId).
+			Count(&conflicts).Error; err != nil {
+			return err
+		}
+		if conflicts > 0 {
+			return common.NewError("client identity belongs to another tenant")
+		}
+	}
+
+	if err := tx.Where("inbound_id = ?", inboundId).Delete(&model.ClientInbound{}).Error; err != nil {
+		return err
 	}
 
 	idByEmail := make(map[string]int, len(emails))

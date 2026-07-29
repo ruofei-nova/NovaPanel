@@ -6,6 +6,7 @@ import { parseMsg } from '@/utils/zodValidate';
 import { NodeListSchema } from '@/schemas/node';
 import type { NodeRecord } from '@/schemas/node';
 import { keys } from '@/api/queryKeys';
+import { useAccount } from '@/api/account';
 
 export type { NodeRecord };
 
@@ -28,9 +29,11 @@ async function fetchNodes(): Promise<NodeRecord[]> {
 }
 
 export function useNodesQuery() {
+  const { account } = useAccount();
   const query = useQuery({
     queryKey: keys.nodes.list(),
     queryFn: fetchNodes,
+    refetchInterval: account?.role === 'customer' ? 10_000 : false,
   });
 
   const nodes = useMemo(() => query.data ?? [], [query.data]);

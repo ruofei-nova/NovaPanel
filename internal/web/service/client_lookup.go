@@ -180,6 +180,28 @@ func (s *ClientService) List() ([]ClientWithAttachments, error) {
 	return out, nil
 }
 
+func (s *ClientService) ListForUser(userID int) ([]ClientWithAttachments, error) {
+	all, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+	emails, err := (&TenantScopeService{}).OwnedClientEmails(userID)
+	if err != nil {
+		return nil, err
+	}
+	allowed := make(map[string]struct{}, len(emails))
+	for _, email := range emails {
+		allowed[email] = struct{}{}
+	}
+	out := make([]ClientWithAttachments, 0, len(allowed))
+	for _, client := range all {
+		if _, ok := allowed[client.Email]; ok {
+			out = append(out, client)
+		}
+	}
+	return out, nil
+}
+
 func (s *ClientService) HasPendingNode(inboundSvc *InboundService, email string) bool {
 	if strings.TrimSpace(email) == "" {
 		return false

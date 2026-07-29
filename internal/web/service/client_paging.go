@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
@@ -100,6 +101,18 @@ func (s *ClientService) ListPaged(inboundSvc *InboundService, settingSvc *Settin
 	if err != nil {
 		return nil, err
 	}
+	return s.listPagedFrom(inboundSvc, settingSvc, params, all, nil)
+}
+
+func (s *ClientService) ListPagedForUser(inboundSvc *InboundService, settingSvc *SettingService, userID int, params ClientPageParams) (*ClientPageResponse, error) {
+	all, err := s.ListForUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.listPagedFrom(inboundSvc, settingSvc, params, all, &userID)
+}
+
+func (s *ClientService) listPagedFrom(inboundSvc *InboundService, settingSvc *SettingService, params ClientPageParams, all []ClientWithAttachments, userID *int) (*ClientPageResponse, error) {
 	total := len(all)
 
 	pageSize := params.PageSize
@@ -120,7 +133,13 @@ func (s *ClientService) ListPaged(inboundSvc *InboundService, settingSvc *Settin
 
 	var protocolByInbound map[int]string
 	if len(protocols) > 0 {
-		inbounds, err := inboundSvc.GetAllInbounds()
+		var inbounds []*model.Inbound
+		var err error
+		if userID == nil {
+			inbounds, err = inboundSvc.GetAllInbounds()
+		} else {
+			inbounds, err = inboundSvc.GetInbounds(*userID)
+		}
 		if err == nil {
 			protocolByInbound = make(map[int]string, len(inbounds))
 			for _, ib := range inbounds {
@@ -203,7 +222,13 @@ func (s *ClientService) ListPaged(inboundSvc *InboundService, settingSvc *Settin
 		items = append(items, toClientSlim(c))
 	}
 
-	groupRows, gErr := s.ListGroups()
+	var groupRows []GroupSummary
+	var gErr error
+	if userID == nil {
+		groupRows, gErr = s.ListGroups()
+	} else {
+		groupRows, gErr = s.ListGroupsForUser(*userID)
+	}
 	if gErr != nil {
 		return nil, gErr
 	}

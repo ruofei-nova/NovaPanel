@@ -7,6 +7,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 
 	"gorm.io/gorm"
 )
@@ -44,8 +45,12 @@ func (s *FallbackService) GetByMaster(masterId int) ([]model.InboundFallback, er
 func (s *FallbackService) GetParentForChild(childId int) (*model.InboundFallback, error) {
 	var row model.InboundFallback
 	err := database.GetDB().
-		Where("child_id = ?", childId).
-		Order("sort_order ASC, id ASC").
+		Table("inbound_fallbacks AS fallbacks").
+		Select("fallbacks.*").
+		Joins("JOIN inbounds AS child ON child.id = fallbacks.child_id").
+		Joins("JOIN inbounds AS master ON master.id = fallbacks.master_id").
+		Where("fallbacks.child_id = ? AND child.user_id = master.user_id", childId).
+		Order("fallbacks.sort_order ASC, fallbacks.id ASC").
 		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -60,6 +65,10 @@ func (s *FallbackService) GetParentForChild(childId int) (*model.InboundFallback
 func (s *FallbackService) SetByMaster(masterId int, items []FallbackInput) error {
 	db := database.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
+		var master model.Inbound
+		if err := tx.Select("id", "user_id", "node_id").First(&master, masterId).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("master_id = ?", masterId).Delete(&model.InboundFallback{}).Error; err != nil {
 			return err
 		}
@@ -70,6 +79,15 @@ func (s *FallbackService) SetByMaster(masterId int, items []FallbackInput) error
 			}
 			if childId <= 0 && strings.TrimSpace(c.Dest) == "" {
 				continue
+			}
+			if childId > 0 {
+				var child model.Inbound
+				if err := tx.Select("id", "user_id", "node_id").First(&child, childId).Error; err != nil {
+					return common.NewError("fallback inbound not found")
+				}
+				if child.UserId != master.UserId || !sameNodeID(child.NodeID, master.NodeID) {
+					return common.NewError("fallback inbound must belong to the same tenant and node")
+				}
 			}
 			row := model.InboundFallback{
 				MasterId:  masterId,
@@ -92,6 +110,13 @@ func (s *FallbackService) SetByMaster(masterId int, items []FallbackInput) error
 	})
 }
 
+func sameNodeID(left, right *int) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
 func (s *FallbackService) BuildFallbacksJSON(tx *gorm.DB, masterId int) ([]map[string]any, error) {
 	if tx == nil {
 		tx = database.GetDB()
@@ -106,18 +131,24 @@ func (s *FallbackService) BuildFallbacksJSON(tx *gorm.DB, masterId int) ([]map[s
 	if len(rows) == 0 {
 		return nil, nil
 	}
+	var master model.Inbound
+	if err := tx.Select("id", "user_id", "node_id").First(&master, masterId).Error; err != nil {
+		return nil, err
+	}
 
 	childIds := make([]int, 0, len(rows))
 	for i := range rows {
 		childIds = append(childIds, rows[i].ChildId)
 	}
 	var children []model.Inbound
-	if err := tx.Where("id IN ?", childIds).Find(&children).Error; err != nil {
+	if err := tx.Where("id IN ? AND user_id = ?", childIds, master.UserId).Find(&children).Error; err != nil {
 		return nil, err
 	}
 	byId := make(map[int]*model.Inbound, len(children))
 	for i := range children {
-		byId[children[i].Id] = &children[i]
+		if sameNodeID(children[i].NodeID, master.NodeID) {
+			byId[children[i].Id] = &children[i]
+		}
 	}
 
 	out := make([]map[string]any, 0, len(rows))

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
+	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
 func initCustomerTestDB(t *testing.T) {
@@ -61,5 +62,74 @@ func TestCustomerLifecycleAndAuthentication(t *testing.T) {
 	}
 	if loggedIn, err := auth.CheckUser("tenant-a", nextPassword, ""); err != nil || loggedIn.Id != user.Id {
 		t.Fatalf("reset password login failed: user=%#v err=%v", loggedIn, err)
+	}
+}
+
+func TestDeleteCustomerUnassignsNodesAndReturnsInboundsToAdmin(t *testing.T) {
+	initCustomerTestDB(t)
+	db := database.GetDB()
+	customers := &CustomerService{}
+
+	customer, _, err := customers.Create("tenant-delete", "long-enough-test-password")
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+	var admin model.User
+	if err := db.Where("role = ?", UserRoleAdmin).Order("id asc").First(&admin).Error; err != nil {
+		t.Fatalf("load admin: %v", err)
+	}
+	node := &model.Node{
+		Name: "tenant-delete-node", Address: "node.example.test", Port: 2053,
+		OwnerUserID: &customer.Id,
+	}
+	if err := db.Create(node).Error; err != nil {
+		t.Fatalf("create node: %v", err)
+	}
+	inbound := &model.Inbound{
+		UserId: customer.Id, NodeID: &node.Id, Tag: "tenant-delete-inbound",
+		Port: 443, Protocol: model.VLESS,
+	}
+	if err := db.Create(inbound).Error; err != nil {
+		t.Fatalf("create inbound: %v", err)
+	}
+	standaloneInbound := &model.Inbound{
+		UserId: customer.Id, Tag: "tenant-delete-standalone",
+		Port: 8443, Protocol: model.VLESS,
+	}
+	if err := db.Create(standaloneInbound).Error; err != nil {
+		t.Fatalf("create standalone inbound: %v", err)
+	}
+	group := &model.ClientGroup{Name: "tenant-delete-group", OwnerUserID: &customer.Id}
+	if err := db.Create(group).Error; err != nil {
+		t.Fatalf("create customer group: %v", err)
+	}
+
+	if err := customers.Delete(customer.Id); err != nil {
+		t.Fatalf("delete customer: %v", err)
+	}
+	if err := db.First(node, node.Id).Error; err != nil {
+		t.Fatalf("reload node: %v", err)
+	}
+	if node.OwnerUserID != nil {
+		t.Fatalf("node owner remained assigned: %v", *node.OwnerUserID)
+	}
+	if err := db.First(inbound, inbound.Id).Error; err != nil {
+		t.Fatalf("reload inbound: %v", err)
+	}
+	if inbound.UserId != admin.Id {
+		t.Fatalf("inbound user_id = %d, want admin %d", inbound.UserId, admin.Id)
+	}
+	if err := db.First(standaloneInbound, standaloneInbound.Id).Error; err != nil {
+		t.Fatalf("reload standalone inbound: %v", err)
+	}
+	if standaloneInbound.UserId != admin.Id {
+		t.Fatalf("standalone inbound user_id = %d, want admin %d", standaloneInbound.UserId, admin.Id)
+	}
+	var groupCount int64
+	if err := db.Model(&model.ClientGroup{}).Where("id = ?", group.Id).Count(&groupCount).Error; err != nil {
+		t.Fatalf("count deleted customer groups: %v", err)
+	}
+	if groupCount != 0 {
+		t.Fatalf("customer-owned group remained after account deletion")
 	}
 }

@@ -142,6 +142,7 @@ interface InboundFormModalProps {
   dbInbounds: DBInbound[];
   availableNodes?: NodeRecord[];
   availableNodesFetched?: boolean;
+  requireNode?: boolean;
 }
 
 function buildAddModeValues(): InboundFormValues {
@@ -191,6 +192,7 @@ export default function InboundFormModal({
   dbInbounds,
   availableNodes,
   availableNodesFetched = true,
+  requireNode = false,
 }: InboundFormModalProps) {
   const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -384,6 +386,14 @@ export default function InboundFormModal({
   }, [open, mode, dbInbound, methods]);
 
   useEffect(() => {
+    if (!open || !requireNode || mode !== 'add' || !availableNodesFetched) return;
+    if (getV('nodeId') != null) return;
+    const firstAvailableNode = selectableNodes.find((node) => node.status !== 'offline');
+    if (firstAvailableNode) setV('nodeId', firstAvailableNode.id);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [open, requireNode, mode, availableNodesFetched, availableNodes]);
+
+  useEffect(() => {
     if (!open) return;
     if (wTag === lastWrittenTagRef.current) return;
     autoTagRef.current = isAutoInboundTag(wTag, currentTagInput());
@@ -472,6 +482,10 @@ export default function InboundFormModal({
      * update wire payload never silently drops every client on save.
      */
     const values = methods.getValues() as InboundFormValues;
+    if (requireNode && values.nodeId == null) {
+      messageApi.error(t('pages.inbounds.deployTo'));
+      return;
+    }
     const parsed = InboundFormSchema.safeParse(values);
     if (!parsed.success) {
       const issues = parsed.error.issues;
@@ -523,13 +537,18 @@ export default function InboundFormModal({
         <Input />
       </FormField>
 
-      {selectableNodes.length > 0 && isNodeEligible && (
-        <FormField name="nodeId" label={t('pages.inbounds.deployTo')}>
+      {(selectableNodes.length > 0 || requireNode) && isNodeEligible && (
+        <FormField
+          name="nodeId"
+          label={t('pages.inbounds.deployTo')}
+          required={requireNode}
+          rules={requireNode ? { required: t('pages.inbounds.deployTo') } : undefined}
+        >
           <Select
             showSearch
             disabled={mode === 'edit'}
             placeholder={t('pages.inbounds.localPanel')}
-            allowClear
+            allowClear={!requireNode}
             options={selectableNodes.map((n) => ({
               value: n.id,
               label: `${n.name}${n.status === 'offline' ? ' (offline)' : ''}`,
@@ -540,7 +559,13 @@ export default function InboundFormModal({
       )}
 
       <FormField name="protocol" label={t('pages.inbounds.protocol')}>
-        <Select id="protocol" disabled={mode === 'edit'} options={PROTOCOL_OPTIONS} />
+        <Select
+          id="protocol"
+          disabled={mode === 'edit'}
+          options={requireNode
+            ? PROTOCOL_OPTIONS.filter((option) => NODE_ELIGIBLE_PROTOCOLS.has(option.value))
+            : PROTOCOL_OPTIONS}
+        />
       </FormField>
 
       <FormField

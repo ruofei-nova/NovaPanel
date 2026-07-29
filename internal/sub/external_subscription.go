@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/util/netsafe"
 )
 
 // External subscription fetching: a "subscription" external link is a remote
@@ -20,7 +22,18 @@ const (
 	subscriptionMaxBytes = 2 << 20 // 2 MiB
 )
 
-var subscriptionHTTPClient = &http.Client{Timeout: 6 * time.Second}
+var subscriptionHTTPClient = &http.Client{
+	Timeout: 6 * time.Second,
+	Transport: &http.Transport{
+		DialContext: netsafe.SSRFGuardedDialContext,
+	},
+	CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return errTooManySubscriptionRedirects
+		}
+		return nil
+	},
+}
 
 type subscriptionCacheEntry struct {
 	links     []string
@@ -92,6 +105,7 @@ func doFetchSubscriptionLinks(rawURL string) ([]string, error) {
 var (
 	errBadStatus                = &subError{"non-2xx subscription response"}
 	errSubscriptionBodyTooLarge = &subError{"subscription response body exceeds size limit"}
+	errTooManySubscriptionRedirects = &subError{"too many subscription redirects"}
 )
 
 type subError struct{ msg string }

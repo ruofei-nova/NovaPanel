@@ -37,7 +37,15 @@ func (a *HostController) initRouter(g *gin.RouterGroup) {
 }
 
 func (a *HostController) list(c *gin.Context) {
-	hosts, err := a.hostService.GetHosts()
+	var (
+		hosts []*entity.HostGroup
+		err   error
+	)
+	if user, customer := customerUser(c); customer {
+		hosts, err = a.hostService.GetHostsForUser(user.Id)
+	} else {
+		hosts, err = a.hostService.GetHosts()
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.list"), err)
 		return
@@ -47,7 +55,18 @@ func (a *HostController) list(c *gin.Context) {
 
 func (a *HostController) get(c *gin.Context) {
 	groupId := c.Param("groupId")
-	h, err := a.hostService.GetHostGroup(groupId)
+	if !requireOwnedHostGroup(c, groupId) {
+		return
+	}
+	var (
+		h   *entity.HostGroup
+		err error
+	)
+	if user, customer := customerUser(c); customer {
+		h, err = a.hostService.GetHostGroupForUser(user.Id, groupId)
+	} else {
+		h, err = a.hostService.GetHostGroup(groupId)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.obtain"), err)
 		return
@@ -61,7 +80,15 @@ func (a *HostController) byInbound(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "get"), err)
 		return
 	}
-	hosts, err := a.hostService.GetHostsByInbound(inboundId)
+	if !requireOwnedInbound(c, inboundId) {
+		return
+	}
+	var hosts []*entity.HostGroup
+	if user, customer := customerUser(c); customer {
+		hosts, err = a.hostService.GetHostsByInboundForUser(user.Id, inboundId)
+	} else {
+		hosts, err = a.hostService.GetHostsByInbound(inboundId)
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.list"), err)
 		return
@@ -70,7 +97,15 @@ func (a *HostController) byInbound(c *gin.Context) {
 }
 
 func (a *HostController) tags(c *gin.Context) {
-	tags, err := a.hostService.GetAllTags()
+	var (
+		tags []string
+		err  error
+	)
+	if user, customer := customerUser(c); customer {
+		tags, err = a.hostService.GetAllTagsForUser(user.Id)
+	} else {
+		tags, err = a.hostService.GetAllTags()
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.list"), err)
 		return
@@ -82,6 +117,15 @@ func (a *HostController) add(c *gin.Context) {
 	req, ok := middleware.BindJSONAndValidate[entity.HostGroup](c)
 	if !ok {
 		return
+	}
+	if _, customer := customerUser(c); customer {
+		if !requireOwnedInboundIDs(c, req.InboundIds) {
+			return
+		}
+		// The create endpoint always creates a fresh tenant-local group. This
+		// prevents a crafted payload from appending rows to another tenant's
+		// existing group by guessing its group ID.
+		req.GroupId = ""
 	}
 	created, err := a.hostService.AddHostGroup(req)
 	if err != nil {
@@ -97,6 +141,9 @@ func (a *HostController) update(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !requireOwnedHostGroup(c, groupId) || !requireOwnedInboundIDs(c, req.InboundIds) {
+		return
+	}
 	updated, err := a.hostService.UpdateHostGroup(groupId, req)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.update"), err)
@@ -107,6 +154,9 @@ func (a *HostController) update(c *gin.Context) {
 
 func (a *HostController) del(c *gin.Context) {
 	groupId := c.Param("groupId")
+	if !requireOwnedHostGroup(c, groupId) {
+		return
+	}
 	if err := a.hostService.DeleteHostGroup(groupId); err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.delete"), err)
 		return
@@ -116,6 +166,9 @@ func (a *HostController) del(c *gin.Context) {
 
 func (a *HostController) setEnable(c *gin.Context) {
 	groupId := c.Param("groupId")
+	if !requireOwnedHostGroup(c, groupId) {
+		return
+	}
 	body := struct {
 		Enable bool `json:"enable" form:"enable"`
 	}{}
@@ -138,6 +191,9 @@ func (a *HostController) reorder(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.update"), err)
 		return
 	}
+	if !requireOwnedHostGroups(c, req.Ids) {
+		return
+	}
 	if err := a.hostService.ReorderHostGroups(req.Ids); err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.update"), err)
 		return
@@ -154,6 +210,9 @@ func (a *HostController) bulkSetEnable(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.update"), err)
 		return
 	}
+	if !requireOwnedHostGroups(c, req.Ids) {
+		return
+	}
 	if err := a.hostService.SetHostsGroupEnable(req.Ids, req.Enable); err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.update"), err)
 		return
@@ -167,6 +226,9 @@ func (a *HostController) bulkDel(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.hosts.toasts.delete"), err)
+		return
+	}
+	if !requireOwnedHostGroups(c, req.Ids) {
 		return
 	}
 	if err := a.hostService.DeleteHostsGroup(req.Ids); err != nil {

@@ -109,6 +109,16 @@ func (a *SettingController) getDefaultSettings(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.getSettings"), err)
 		return
 	}
+	// Certificate paths belong to the central server and are both sensitive
+	// implementation details and invalid defaults for a customer's remote VPS.
+	// Node-bound inbound forms fetch their own node's paths through the scoped
+	// nodes/webCert endpoint instead.
+	if _, customer := customerUser(c); customer {
+		if values, ok := result.(map[string]any); ok {
+			values["defaultCert"] = ""
+			values["defaultKey"] = ""
+		}
+	}
 	jsonObj(c, result, nil)
 }
 

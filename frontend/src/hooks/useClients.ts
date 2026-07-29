@@ -33,6 +33,7 @@ import {
 } from '@/schemas/client';
 import { DefaultsPayloadSchema } from '@/schemas/defaults';
 import { TRAFFIC_POLL_INTERVAL_S } from '@/lib/traffic/poll-interval';
+import { useAccount } from '@/api/account';
 
 // One row sent to POST /clients/:email/externalLinks.
 export type ExternalLinkInput = { kind: 'link' | 'subscription'; value: string; remark: string };
@@ -163,6 +164,7 @@ async function fetchDefaults(): Promise<Record<string, unknown>> {
 
 export function useClients() {
   const queryClient = useQueryClient();
+  const { account } = useAccount();
 
   const [query, setQueryState] = useState<ClientQueryParams>(DEFAULT_QUERY);
   // setQuery shallow-compares so callers can pass a fresh object every render
@@ -223,6 +225,7 @@ export function useClients() {
       return Array.isArray(validated.obj) ? validated.obj : [];
     },
     staleTime: Infinity,
+    refetchInterval: account?.role === 'customer' ? 5_000 : false,
   });
 
   const clients = listQuery.data?.items ?? [];

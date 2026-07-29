@@ -191,6 +191,46 @@ func (s *HostService) GetHosts() ([]*entity.HostGroup, error) {
 	return groupHosts(hosts), nil
 }
 
+// getHostRowsForUser returns only host groups whose every inbound belongs to
+// userId. A legacy/malformed group spanning multiple tenants is deliberately
+// hidden instead of returning a partial group that could be mutated later.
+//
+// Empty legacy group IDs are treated as one-row fallback groups by groupHosts,
+// so each such row is scoped solely through its own inbound.
+func (s *HostService) getHostRowsForUser(userId int) ([]*model.Host, error) {
+	if userId <= 0 {
+		return []*model.Host{}, nil
+	}
+
+	var hosts []*model.Host
+	err := database.GetDB().
+		Table("hosts AS tenant_hosts").
+		Select("tenant_hosts.*").
+		Joins("JOIN inbounds AS tenant_inbounds ON tenant_inbounds.id = tenant_hosts.inbound_id").
+		Where("tenant_inbounds.user_id = ?", userId).
+		Where(`tenant_hosts.group_id = '' OR NOT EXISTS (
+			SELECT 1
+			FROM hosts AS other_hosts
+			JOIN inbounds AS other_inbounds ON other_inbounds.id = other_hosts.inbound_id
+			WHERE other_hosts.group_id = tenant_hosts.group_id
+			  AND other_inbounds.user_id <> ?
+		)`, userId).
+		Order("tenant_hosts.inbound_id asc, tenant_hosts.sort_order asc, tenant_hosts.id asc").
+		Find(&hosts).Error
+	if hosts == nil {
+		hosts = []*model.Host{}
+	}
+	return hosts, err
+}
+
+func (s *HostService) GetHostsForUser(userId int) ([]*entity.HostGroup, error) {
+	hosts, err := s.getHostRowsForUser(userId)
+	if err != nil {
+		return nil, err
+	}
+	return groupHosts(hosts), nil
+}
+
 func (s *HostService) GetHostsByInbound(inboundId int) ([]*entity.HostGroup, error) {
 	var groupIds []string
 	if err := database.GetDB().Model(&model.Host{}).Where("inbound_id = ?", inboundId).Distinct().Pluck("group_id", &groupIds).Error; err != nil {
@@ -204,6 +244,20 @@ func (s *HostService) GetHostsByInbound(inboundId int) ([]*entity.HostGroup, err
 		return nil, err
 	}
 	return groupHosts(hosts), nil
+}
+
+func (s *HostService) GetHostsByInboundForUser(userId, inboundId int) ([]*entity.HostGroup, error) {
+	groups, err := s.GetHostsForUser(userId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*entity.HostGroup, 0)
+	for _, group := range groups {
+		if slices.Contains(group.InboundIds, inboundId) {
+			result = append(result, group)
+		}
+	}
+	return result, nil
 }
 
 func (s *HostService) GetHostGroup(groupId string) (*entity.HostGroup, error) {
@@ -220,6 +274,19 @@ func (s *HostService) GetHostGroup(groupId string) (*entity.HostGroup, error) {
 		return nil, common.NewError("host not found")
 	}
 	return grouped[0], nil
+}
+
+func (s *HostService) GetHostGroupForUser(userId int, groupId string) (*entity.HostGroup, error) {
+	groups, err := s.GetHostsForUser(userId)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		if group.GroupId == groupId {
+			return group, nil
+		}
+	}
+	return nil, common.NewError("host not found")
 }
 
 func (s *HostService) AddHostGroup(req *entity.HostGroup) ([]*model.Host, error) {
@@ -314,6 +381,18 @@ func (s *HostService) GetAllTags() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return collectHostTags(hosts), nil
+}
+
+func (s *HostService) GetAllTagsForUser(userId int) ([]string, error) {
+	hosts, err := s.getHostRowsForUser(userId)
+	if err != nil {
+		return nil, err
+	}
+	return collectHostTags(hosts), nil
+}
+
+func collectHostTags(hosts []*model.Host) []string {
 	set := make(map[string]struct{})
 	for _, h := range hosts {
 		for _, tag := range h.Tags {
@@ -327,7 +406,7 @@ func (s *HostService) GetAllTags() ([]string, error) {
 		out = append(out, tag)
 	}
 	sort.Strings(out)
-	return out, nil
+	return out
 }
 
 func parseHostAndPort(hostStr string, defaultPort int) (string, int) {
