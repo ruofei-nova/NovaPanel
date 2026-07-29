@@ -103,8 +103,8 @@ func doFetchSubscriptionLinks(rawURL string) ([]string, error) {
 }
 
 var (
-	errBadStatus                = &subError{"non-2xx subscription response"}
-	errSubscriptionBodyTooLarge = &subError{"subscription response body exceeds size limit"}
+	errBadStatus                    = &subError{"non-2xx subscription response"}
+	errSubscriptionBodyTooLarge     = &subError{"subscription response body exceeds size limit"}
 	errTooManySubscriptionRedirects = &subError{"too many subscription redirects"}
 )
 
