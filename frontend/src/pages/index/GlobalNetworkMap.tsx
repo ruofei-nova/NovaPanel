@@ -30,12 +30,12 @@ function toGlobeNode(node: {
   };
 }
 
-function globePosition(latitude: number, longitude: number, radius = 2.025) {
+export function globePosition(latitude: number, longitude: number, radius = 2.025) {
   const latitudeScale = Math.cos(latitude);
   return new THREE.Vector3(
-    radius * latitudeScale * Math.sin(longitude),
-    radius * Math.sin(latitude),
     radius * latitudeScale * Math.cos(longitude),
+    radius * Math.sin(latitude),
+    -radius * latitudeScale * Math.sin(longitude),
   );
 }
 
