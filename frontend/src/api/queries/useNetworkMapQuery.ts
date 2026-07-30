@@ -19,10 +19,12 @@ export interface NetworkMapConnection {
   longitude: number;
   lastSeen: number;
   activeCount: number;
+  source: 'gps' | 'ip';
 }
 
 export interface NetworkMapPayload {
   geoReady: boolean;
+  gpsReady: boolean;
   generatedAt: number;
   nodes: NetworkMapNode[];
   connections: NetworkMapConnection[];
@@ -30,6 +32,7 @@ export interface NetworkMapPayload {
 
 const emptyPayload: NetworkMapPayload = {
   geoReady: false,
+  gpsReady: false,
   generatedAt: 0,
   nodes: [],
   connections: [],

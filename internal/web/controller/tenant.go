@@ -23,6 +23,8 @@ func NewTenantController(api *gin.RouterGroup) *TenantController {
 
 	network := api.Group("/network")
 	network.GET("/map", controller.networkMap)
+	network.POST("/location", controller.saveLocation)
+	network.POST("/location/clear", controller.clearLocation)
 
 	customers := api.Group("/customers")
 	customers.Use(controller.adminOnly)
@@ -69,6 +71,44 @@ func (a *TenantController) networkMap(c *gin.Context) {
 	}
 	payload, err := service.GetNetworkMap(ownerID)
 	jsonObj(c, payload, err)
+}
+
+func (a *TenantController) saveLocation(c *gin.Context) {
+	user := session.GetLoginUser(c)
+	if user == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if user.Role != panel.UserRoleCustomer {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"msg":     "customer access required",
+		})
+		return
+	}
+	var req service.CustomerLocationInput
+	if err := c.ShouldBind(&req); err != nil {
+		jsonObj(c, nil, err)
+		return
+	}
+	location, err := service.SaveCustomerLocation(user.Id, req)
+	jsonObj(c, location, err)
+}
+
+func (a *TenantController) clearLocation(c *gin.Context) {
+	user := session.GetLoginUser(c)
+	if user == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if user.Role != panel.UserRoleCustomer {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"msg":     "customer access required",
+		})
+		return
+	}
+	jsonObj(c, gin.H{"cleared": true}, service.ClearCustomerLocation(user.Id))
 }
 
 func (a *TenantController) listCustomers(c *gin.Context) {

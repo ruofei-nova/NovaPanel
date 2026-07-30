@@ -3,6 +3,8 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -35,13 +37,65 @@ type NetworkMapConnection struct {
 	Longitude   float64 `json:"longitude"`
 	LastSeen    int64   `json:"lastSeen"`
 	ActiveCount int     `json:"activeCount"`
+	Source      string  `json:"source"`
 }
 
 type NetworkMapPayload struct {
 	GeoReady    bool                   `json:"geoReady"`
+	GPSReady    bool                   `json:"gpsReady"`
 	GeneratedAt int64                  `json:"generatedAt"`
 	Nodes       []NetworkMapNode       `json:"nodes"`
 	Connections []NetworkMapConnection `json:"connections"`
+}
+
+type CustomerLocationInput struct {
+	Latitude  float64 `json:"latitude" form:"latitude"`
+	Longitude float64 `json:"longitude" form:"longitude"`
+	AccuracyM float64 `json:"accuracyM" form:"accuracyM"`
+}
+
+func validateCustomerLocation(input CustomerLocationInput) error {
+	if math.IsNaN(input.Latitude) || math.IsInf(input.Latitude, 0) ||
+		input.Latitude < -90 || input.Latitude > 90 {
+		return fmt.Errorf("latitude is out of range")
+	}
+	if math.IsNaN(input.Longitude) || math.IsInf(input.Longitude, 0) ||
+		input.Longitude < -180 || input.Longitude > 180 {
+		return fmt.Errorf("longitude is out of range")
+	}
+	if math.IsNaN(input.AccuracyM) || math.IsInf(input.AccuracyM, 0) ||
+		input.AccuracyM < 0 || input.AccuracyM > 100000 {
+		return fmt.Errorf("accuracy is out of range")
+	}
+	return nil
+}
+
+func SaveCustomerLocation(userID int, input CustomerLocationInput) (*model.CustomerLocation, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid customer")
+	}
+	if err := validateCustomerLocation(input); err != nil {
+		return nil, err
+	}
+	location := &model.CustomerLocation{
+		UserID: userID, Latitude: input.Latitude, Longitude: input.Longitude,
+		AccuracyM: input.AccuracyM, UpdatedAt: time.Now().Unix(),
+	}
+	err := database.GetDB().Where("user_id = ?", userID).
+		Assign(map[string]any{
+			"latitude": input.Latitude, "longitude": input.Longitude,
+			"accuracy_m": input.AccuracyM, "updated_at": location.UpdatedAt,
+		}).
+		FirstOrCreate(location).Error
+	return location, err
+}
+
+func ClearCustomerLocation(userID int) error {
+	if userID <= 0 {
+		return fmt.Errorf("invalid customer")
+	}
+	return database.GetDB().Where("user_id = ?", userID).
+		Delete(&model.CustomerLocation{}).Error
 }
 
 type geoCityRecord struct {
@@ -132,6 +186,9 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 		Connections: []NetworkMapConnection{},
 	}
 	guidToNode := make(map[string]int, len(nodes))
+	nodeOwners := make(map[int]int, len(nodes))
+	ownerIDs := make([]int, 0, len(nodes))
+	seenOwners := make(map[int]struct{}, len(nodes))
 	for _, node := range nodes {
 		attributionKey := effectiveNodeKey(node)
 		payload.Nodes = append(payload.Nodes, NetworkMapNode{
@@ -142,6 +199,39 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 		if attributionKey != "" {
 			guidToNode[attributionKey] = node.Id
 		}
+		if node.OwnerUserID != nil {
+			nodeOwners[node.Id] = *node.OwnerUserID
+			if _, exists := seenOwners[*node.OwnerUserID]; !exists {
+				seenOwners[*node.OwnerUserID] = struct{}{}
+				ownerIDs = append(ownerIDs, *node.OwnerUserID)
+			}
+		}
+	}
+	const preciseLocationWindow = int64(24 * 60 * 60)
+	preciseLocations := make(map[int]model.CustomerLocation, len(ownerIDs))
+	if len(ownerIDs) > 0 {
+		var locations []model.CustomerLocation
+		if err := db.Where("user_id IN ? AND updated_at >= ?", ownerIDs,
+			payload.GeneratedAt-preciseLocationWindow).Find(&locations).Error; err != nil {
+			return nil, err
+		}
+		for _, location := range locations {
+			preciseLocations[location.UserID] = location
+		}
+	}
+	payload.GPSReady = len(preciseLocations) > 0
+	for _, node := range nodes {
+		if node.OwnerUserID == nil {
+			continue
+		}
+		location, ok := preciseLocations[*node.OwnerUserID]
+		if !ok {
+			continue
+		}
+		payload.Connections = append(payload.Connections, NetworkMapConnection{
+			NodeID: node.Id, Latitude: location.Latitude, Longitude: location.Longitude,
+			LastSeen: location.UpdatedAt, ActiveCount: 0, Source: "gps",
+		})
 	}
 	if len(guidToNode) == 0 {
 		return payload, nil
@@ -179,6 +269,11 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 			if !ok {
 				continue
 			}
+			if ownerID, exists := nodeOwners[nodeID]; exists {
+				if _, hasGPS := preciseLocations[ownerID]; hasGPS {
+					continue
+				}
+			}
 			key := strings.Join([]string{
 				row.NodeGuid,
 				formatCoordinate(lat),
@@ -201,7 +296,7 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 	for _, bucket := range buckets {
 		payload.Connections = append(payload.Connections, NetworkMapConnection{
 			NodeID: bucket.nodeID, Latitude: bucket.lat, Longitude: bucket.lon,
-			LastSeen: bucket.lastSeen, ActiveCount: len(bucket.ips),
+			LastSeen: bucket.lastSeen, ActiveCount: len(bucket.ips), Source: "ip",
 		})
 	}
 	sort.Slice(payload.Connections, func(i, j int) bool {

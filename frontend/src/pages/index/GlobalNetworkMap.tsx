@@ -194,9 +194,9 @@ export default function GlobalNetworkMap() {
       const line = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 36, 0.009, 6, false),
         new THREE.MeshBasicMaterial({
-          color: 0x53ead7,
+          color: connection.source === 'gps' ? 0x8cfff0 : 0x53ead7,
           transparent: true,
-          opacity: 0.48,
+          opacity: connection.source === 'gps' ? 0.72 : 0.48,
           blending: THREE.AdditiveBlending,
         }),
       );
@@ -205,7 +205,7 @@ export default function GlobalNetworkMap() {
       const sourceMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.min(connection.activeCount, 8) * 0.003, 10, 10),
         new THREE.MeshBasicMaterial({
-          color: 0x8cfff0,
+          color: connection.source === 'gps' ? 0xd2fff8 : 0x8cfff0,
           transparent: true,
           opacity: 0.92,
           blending: THREE.AdditiveBlending,

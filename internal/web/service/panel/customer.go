@@ -120,6 +120,9 @@ func (s *CustomerService) Delete(id int) error {
 		if err := tx.Where("owner_user_id = ?", id).Delete(&model.ClientGroup{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("user_id = ?", id).Delete(&model.CustomerLocation{}).Error; err != nil {
+			return err
+		}
 		result := tx.Where("id = ? AND role = ?", id, UserRoleCustomer).Delete(&model.User{})
 		if result.Error != nil {
 			return result.Error

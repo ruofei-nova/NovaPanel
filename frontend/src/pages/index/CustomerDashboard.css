@@ -18,6 +18,28 @@
   background: rgba(7, 27, 29, 0.82);
 }
 
+.gps-consent-button.ant-btn {
+  height: auto;
+  padding: 0;
+  color: #55e6d2;
+  font-size: 12px;
+}
+
+.customer-dashboard .network-map-card.ant-card {
+  height: auto;
+  min-height: 0;
+}
+
+.customer-dashboard .network-map-card .ant-card-body {
+  flex: none;
+}
+
+.customer-dashboard .globe-stage {
+  height: clamp(360px, 52vh, 520px);
+  min-height: 0;
+  flex: none;
+}
+
 .geo-attribution {
   display: block;
   margin-top: 8px;
@@ -33,5 +55,8 @@
   }
   .customer-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .customer-dashboard .globe-stage {
+    height: clamp(300px, 46vh, 400px);
   }
 }
