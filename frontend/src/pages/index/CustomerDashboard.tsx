@@ -83,7 +83,7 @@ export default function CustomerDashboard() {
           <Layout.Content className="content-area customer-content">
             <header className="dashboard-command-header">
               <div>
-                <span className="dashboard-kicker">NOVAPANEL / PRIVATE NETWORK</span>
+                <span className="dashboard-kicker">NOVARUO / PRIVATE NETWORK</span>
                 <h1>网络控制中心</h1>
               </div>
               <div className="dashboard-live-meta">

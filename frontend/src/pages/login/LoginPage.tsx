@@ -176,7 +176,7 @@ export default function LoginPage() {
               <div className="login-card">
                 <div className="brand">
                   <NovaLogo />
-                  <span className="brand-name">Nova Panel</span>
+                  <span className="brand-name">NovaRuo</span>
                   <span className="brand-accent" aria-hidden="true" />
                 </div>
                 <h2 className="welcome">

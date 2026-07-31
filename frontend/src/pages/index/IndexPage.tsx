@@ -171,7 +171,7 @@ function AdminIndexPage() {
           <Layout.Content className="content-area">
             <header className="dashboard-command-header">
               <div>
-                <span className="dashboard-kicker">NOVAPANEL / CONTROL CENTER</span>
+                <span className="dashboard-kicker">NOVARUO / CONTROL CENTER</span>
                 <h1>系统状态</h1>
               </div>
               <div className="dashboard-live-meta">
@@ -246,7 +246,7 @@ function AdminIndexPage() {
                     <Card
                       title={
                         <Space>
-                          <span>Nova Panel</span>
+                          <span>NovaRuo</span>
                           {isMobile && displayVersion && (
                             <Tag color={panelUpdateInfo.updateAvailable ? 'orange' : 'green'}>
                               {panelUpdateInfo.updateAvailable
