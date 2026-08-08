@@ -102,7 +102,7 @@ export default function GlobalNetworkMap() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1;
+    renderer.toneMappingExposure = 1.18;
     renderer.setClearColor(0x000000, 0);
     mount.appendChild(renderer.domElement);
 
@@ -117,9 +117,14 @@ export default function GlobalNetworkMap() {
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshStandardMaterial({
       map: texture,
-      color: 0xffffff,
+      color: 0x88d8ce,
+      emissive: 0x58e5d4,
+      emissiveMap: texture,
+      emissiveIntensity: 0.42,
+      metalness: 0.04,
+      roughness: 0.86,
     });
     globeGroup.add(new THREE.Mesh(geometry, material));
 
