@@ -111,6 +111,36 @@ export default function GlobalNetworkMap() {
     globeGroup.rotation.z = -0.12;
     scene.add(globeGroup);
 
+    // A restrained deep-space backdrop keeps the dashboard cinematic without
+    // competing with node markers and routes. The seeded distribution avoids
+    // the star field jumping to a new layout after every page refresh.
+    const starCount = 520;
+    const starPositions = new Float32Array(starCount * 3);
+    let starSeed = 0x6e6f7661;
+    const seededRandom = () => {
+      starSeed = (starSeed * 1664525 + 1013904223) >>> 0;
+      return starSeed / 0x100000000;
+    };
+    for (let index = 0; index < starCount; index += 1) {
+      const offset = index * 3;
+      starPositions[offset] = (seededRandom() - 0.5) * 15;
+      starPositions[offset + 1] = (seededRandom() - 0.5) * 9;
+      starPositions[offset + 2] = -1.5 - seededRandom() * 8;
+    }
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({
+      color: 0x9ffdf3,
+      size: 0.018,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
     const texture = new THREE.TextureLoader().load(globeTexture);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
@@ -126,6 +156,41 @@ export default function GlobalNetworkMap() {
       roughness: 0.82,
     });
     globeGroup.add(new THREE.Mesh(geometry, material));
+
+    // Back-face Fresnel shell: a soft atmosphere glow that follows the real
+    // sphere silhouette and therefore never changes map coordinates.
+    const atmosphereGeometry = new THREE.SphereGeometry(2.055, 96, 72);
+    const atmosphereMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        glowColor: { value: new THREE.Color(0x48e8d8) },
+        intensity: { value: 0.82 },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
+        void main() {
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal);
+          vViewPosition = -mvPosition.xyz;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 glowColor;
+        uniform float intensity;
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
+        void main() {
+          float fresnel = pow(1.0 - max(0.0, dot(normalize(vNormal), normalize(vViewPosition))), 3.15);
+          gl_FragColor = vec4(glowColor, fresnel * intensity);
+        }
+      `,
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    globeGroup.add(new THREE.Mesh(atmosphereGeometry, atmosphereMaterial));
 
     const networkGroup = new THREE.Group();
     globeGroup.add(networkGroup);
@@ -181,6 +246,8 @@ export default function GlobalNetworkMap() {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
       globeGroup.rotation.y += delta * 0.18;
+      stars.rotation.y -= delta * 0.006;
+      starMaterial.opacity = 0.43 + Math.sin(timer.getElapsed() * 0.72) * 0.07;
       for (const child of networkGroup.children) {
         if (child.userData.pulse) {
           const scale = 0.84 + Math.sin(timer.getElapsed() * 3.2 + child.userData.phase) * 0.2;
@@ -201,6 +268,10 @@ export default function GlobalNetworkMap() {
       for (const child of networkGroup.children) disposeObject(child);
       geometry.dispose();
       material.dispose();
+      atmosphereGeometry.dispose();
+      atmosphereMaterial.dispose();
+      starGeometry.dispose();
+      starMaterial.dispose();
       texture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
