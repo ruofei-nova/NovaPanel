@@ -196,8 +196,8 @@ jobs:
           rm -f geoip.dat geosite.dat
           fetch "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geoip.dat"
           fetch "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${GEODATA_VERSION}/geosite.dat"
-          fetch -O geoip_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geoip.dat"
-          fetch -O geosite_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/${IRAN_GEODATA_VERSION}/geosite.dat"
+          fetch -O geoip_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat"
+          fetch -O geosite_IR.dat "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat"
           fetch -O geoip_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geoip.dat"
           fetch -O geosite_RU.dat "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/${RUSSIA_GEODATA_VERSION}/geosite.dat"
           mv xray xray-linux-${{ matrix.platform }}
@@ -325,8 +325,8 @@ jobs:
           Remove-Item geoip.dat, geosite.dat -ErrorAction SilentlyContinue
           Get-Asset "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geoip.dat" "geoip.dat"
           Get-Asset "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geosite.dat" "geosite.dat"
-          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geoip.dat" "geoip_IR.dat"
-          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geosite.dat" "geosite_IR.dat"
+          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat" "geoip_IR.dat"
+          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat" "geosite_IR.dat"
           Get-Asset "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geoip.dat" "geoip_RU.dat"
           Get-Asset "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geosite.dat" "geosite_RU.dat"
           Rename-Item xray.exe xray-windows-amd64.exe
