@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { globePosition } from '@/pages/index/GlobalNetworkMap';
+import { globePosition, HONG_KONG_HUB } from '@/pages/index/GlobalNetworkMap';
 
 const radians = (degrees: number) => degrees * (Math.PI / 180);
 
@@ -24,5 +24,18 @@ describe('globePosition', () => {
     expect(losAngeles.x).toBeLessThan(0);
     expect(losAngeles.y).toBeGreaterThan(0);
     expect(losAngeles.z).toBeGreaterThan(0);
+  });
+
+  it('pins the network hub to Hong Kong', () => {
+    expect(HONG_KONG_HUB.latitude).toBeCloseTo(22.3193, 4);
+    expect(HONG_KONG_HUB.longitude).toBeCloseTo(114.1694, 4);
+
+    const hongKong = globePosition(
+      radians(HONG_KONG_HUB.latitude),
+      radians(HONG_KONG_HUB.longitude),
+      1,
+    );
+    expect(hongKong.y).toBeGreaterThan(0);
+    expect(hongKong.z).toBeLessThan(0);
   });
 });

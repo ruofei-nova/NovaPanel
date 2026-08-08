@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from 'antd';
 import * as THREE from 'three';
 
@@ -8,13 +8,28 @@ import './GlobalNetworkMap.css';
 
 interface GlobeNode {
   id: number;
+  name: string;
   longitude: number;
   latitude: number;
   status: 'online' | 'slow' | 'offline';
 }
 
+interface GlobeTooltip {
+  title: string;
+  detail: string;
+  x: number;
+  y: number;
+}
+
+export const HONG_KONG_HUB = {
+  name: '香港网络中心',
+  latitude: 22.3193,
+  longitude: 114.1694,
+} as const;
+
 function toGlobeNode(node: {
   id: number;
+  name: string;
   longitude: number;
   latitude: number;
   status: string;
@@ -22,6 +37,7 @@ function toGlobeNode(node: {
 }): GlobeNode {
   return {
     id: node.id,
+    name: node.name,
     longitude: node.longitude * (Math.PI / 180),
     latitude: node.latitude * (Math.PI / 180),
     status: node.status !== 'online'
@@ -50,6 +66,7 @@ function disposeObject(child: THREE.Object3D) {
 export default function GlobalNetworkMap() {
   const mountRef = useRef<HTMLDivElement>(null);
   const networkGroupRef = useRef<THREE.Group | null>(null);
+  const [tooltip, setTooltip] = useState<GlobeTooltip | null>(null);
   const { data } = useNetworkMapQuery();
   const globeNodes = useMemo(
     () => data.nodes
@@ -125,6 +142,32 @@ export default function GlobalNetworkMap() {
     observer.observe(mount);
     resize();
 
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const handlePointerMove = (event: PointerEvent) => {
+      const bounds = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(networkGroup.children, false)
+        .find((item) => item.object.userData.tooltip);
+      if (!hit) {
+        setTooltip(null);
+        renderer.domElement.style.cursor = 'default';
+        return;
+      }
+      const info = hit.object.userData.tooltip as Omit<GlobeTooltip, 'x' | 'y'>;
+      setTooltip({
+        ...info,
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
+      renderer.domElement.style.cursor = 'crosshair';
+    };
+    const handlePointerLeave = () => setTooltip(null);
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
+
     const timer = new THREE.Timer();
     let animationId = 0;
     const animate = () => {
@@ -145,6 +188,8 @@ export default function GlobalNetworkMap() {
     return () => {
       window.cancelAnimationFrame(animationId);
       observer.disconnect();
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
       networkGroupRef.current = null;
       for (const child of networkGroup.children) disposeObject(child);
       geometry.dispose();
@@ -176,7 +221,51 @@ export default function GlobalNetworkMap() {
       marker.position.copy(globePosition(node.latitude, node.longitude));
       marker.userData.pulse = true;
       marker.userData.phase = node.id;
+      marker.userData.tooltip = {
+        title: node.name,
+        detail: `VPS 节点 · ${THREE.MathUtils.radToDeg(node.latitude).toFixed(6)}, ${THREE.MathUtils.radToDeg(node.longitude).toFixed(6)}`,
+      };
       group.add(marker);
+    }
+
+    const hubLatitude = HONG_KONG_HUB.latitude * (Math.PI / 180);
+    const hubLongitude = HONG_KONG_HUB.longitude * (Math.PI / 180);
+    const hubPosition = globePosition(hubLatitude, hubLongitude);
+    const hubMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.064, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd36a,
+        transparent: true,
+        opacity: 0.96,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    hubMarker.position.copy(hubPosition);
+    hubMarker.userData.pulse = true;
+    hubMarker.userData.phase = 0;
+    hubMarker.userData.tooltip = {
+      title: HONG_KONG_HUB.name,
+      detail: `固定起点 · ${HONG_KONG_HUB.latitude.toFixed(6)}, ${HONG_KONG_HUB.longitude.toFixed(6)}`,
+    };
+    group.add(hubMarker);
+
+    for (const node of globeNodes.slice(0, 48)) {
+      const target = globePosition(node.latitude, node.longitude);
+      if (hubPosition.distanceTo(target) < 0.02) continue;
+      const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
+      const distance = hubPosition.distanceTo(target);
+      midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
+      const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
+      const hubLine = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
+        new THREE.MeshBasicMaterial({
+          color: 0x7ef5e3,
+          transparent: true,
+          opacity: node.status === 'offline' ? 0.18 : 0.46,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      group.add(hubLine);
     }
 
     for (const [index, connection] of data.connections.slice(0, 80).entries()) {
@@ -214,21 +303,38 @@ export default function GlobalNetworkMap() {
       sourceMarker.position.copy(source);
       sourceMarker.userData.pulse = true;
       sourceMarker.userData.phase = index * 0.7;
+      sourceMarker.userData.tooltip = {
+        title: connection.source === 'gps' ? '客户 GPS 位置' : '客户网络位置',
+        detail: `${connection.source} · ${connection.latitude.toFixed(6)}, ${connection.longitude.toFixed(6)} · ${connection.activeCount} 在线`,
+      };
       group.add(sourceMarker);
     }
   }, [data.connections, globeNodes, nodeByID]);
 
   return (
     <Card className="network-map-card globe-card" title="全球网络状态">
-      <div
-        ref={mountRef}
-        className="globe-stage globe-webgl"
-        aria-label="自动旋转的三维全球网络球体"
-      />
+      <div className="globe-stage">
+        <div
+          ref={mountRef}
+          className="globe-webgl"
+          aria-label="自动旋转的三维全球网络球体"
+        />
+        {tooltip && (
+          <div
+            className="globe-tooltip"
+            style={{ left: tooltip.x, top: tooltip.y }}
+            role="status"
+          >
+            <strong>{tooltip.title}</strong>
+            <span>{tooltip.detail}</span>
+          </div>
+        )}
+      </div>
       <div className="network-legend" aria-hidden="true">
         <span><i className="online" />在线</span>
         <span><i className="slow" />高延迟</span>
         <span><i className="offline" />离线</span>
+        <span><i className="hub" />香港中心</span>
         <b>LIVE NETWORK</b>
       </div>
       <a
