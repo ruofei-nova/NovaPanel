@@ -107,6 +107,19 @@ else
     _fail "ERROR: Command 'curl' not found."
 fi
 
+# Self-updates download large release archives from GitHub. Bound stalled
+# connections so a dead transfer cannot hold the panel's single update slot
+# indefinitely, and retry transient network failures automatically.
+curl_update_opts=(
+    --connect-timeout 15
+    --max-time 900
+    --retry 3
+    --retry-delay 2
+    --retry-connrefused
+    --speed-time 60
+    --speed-limit 1024
+)
+
 # Check OS and set release variable
 if [[ -f /etc/os-release ]]; then
     source /etc/os-release
@@ -1011,7 +1024,7 @@ _verify_release_checksum() {
     sums_file="${archive}.SHA256SUMS.$$"
 
     rm -f "$sums_file"
-    if ! ${curl_bin} -fsSL -o "$sums_file" \
+    if ! ${curl_bin} "${curl_update_opts[@]}" -fsSL -o "$sums_file" \
         "https://github.com/ruofei-nova/NovaPanel/releases/download/${tag}/SHA256SUMS"; then
         rm -f "$sums_file"
         if [[ "$tag" != "dev-latest" ]] && \
@@ -1064,13 +1077,13 @@ update_x-ui() {
         tag_version="${XUI_UPDATE_TAG}"
         echo -e "${green}Using update tag: ${tag_version}${plain}"
     else
-        tag_version=$(${curl_bin} -Ls "https://api.github.com/repos/ruofei-nova/NovaPanel/releases/latest" 2> /dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        tag_version=$(${curl_bin} "${curl_update_opts[@]}" -Ls "https://api.github.com/repos/ruofei-nova/NovaPanel/releases/latest" 2> /dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$tag_version" ]]; then
             _fail "ERROR: Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later"
         fi
     fi
     echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-    ${curl_bin} -fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/ruofei-nova/NovaPanel/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz 2> /dev/null
+    ${curl_bin} "${curl_update_opts[@]}" -fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/ruofei-nova/NovaPanel/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz 2> /dev/null
     if [[ $? -ne 0 ]]; then
         _fail "ERROR: Failed to download x-ui, please be sure that your server can access GitHub"
     fi
