@@ -108,8 +108,8 @@ jobs:
 
       - name: Build Nova Panel
         run: |
-          CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 3"
-          fetch() { wget -q --tries=5 --waitretry=10 --retry-on-http-error=429,500,502,503 "$@"; }
+          CURL_RETRY="--retry 8 --retry-all-errors --retry-delay 5"
+          fetch() { wget -q --tries=8 --waitretry=10 --retry-on-http-error=429,500,502,503,504 "$@"; }
           export CGO_ENABLED=1
           export GOOS=linux
           export GOARCH=${{ matrix.platform }}
@@ -302,7 +302,7 @@ jobs:
       - name: Copy and download resources
         shell: pwsh
         run: |
-          $retry = @{ MaximumRetryCount = 5; RetryIntervalSec = 10 }
+          $retry = @{ MaximumRetryCount = 8; RetryIntervalSec = 10 }
           mkdir x-ui
           Copy-Item xui-release.exe x-ui\x-ui.exe
           mkdir x-ui\bin
@@ -327,7 +327,7 @@ jobs:
           # release-page redirect on github.com — not api.github.com, whose
           # outages have failed release runs while asset downloads kept working.
           $MTG_PKG = "mtg-multi-$($env:MTG_MULTI_VERSION.TrimStart('v'))-windows-amd64"
-          curl.exe -sfLRO --retry 5 --retry-all-errors --retry-delay 3 "https://github.com/mhsanaei/mtg-multi/releases/download/$env:MTG_MULTI_VERSION/$MTG_PKG.zip"
+          curl.exe -sfLRO --retry 8 --retry-all-errors --retry-delay 5 "https://github.com/mhsanaei/mtg-multi/releases/download/$env:MTG_MULTI_VERSION/$MTG_PKG.zip"
           Expand-Archive -Path "$MTG_PKG.zip" -DestinationPath "mtg-tmp" -Force
           Move-Item "mtg-tmp/$MTG_PKG/mtg-multi.exe" "mtg-windows-amd64.exe"
           Remove-Item -Recurse -Force "mtg-tmp", "$MTG_PKG.zip"
