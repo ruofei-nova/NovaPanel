@@ -109,7 +109,13 @@ jobs:
       - name: Build Nova Panel
         run: |
           CURL_RETRY="--retry 8 --retry-all-errors --retry-delay 5"
-          fetch() { wget -q --tries=8 --waitretry=10 --retry-on-http-error=429,500,502,503,504 "$@"; }
+          fetch() {
+            if [[ "${1:-}" == "-O" ]]; then
+              curl -fL -sS $CURL_RETRY -o "$2" "$3"
+            else
+              curl -fL -sS $CURL_RETRY -O "$1"
+            fi
+          }
           export CGO_ENABLED=1
           export GOOS=linux
           export GOARCH=${{ matrix.platform }}
@@ -302,7 +308,10 @@ jobs:
       - name: Copy and download resources
         shell: pwsh
         run: |
-          $retry = @{ MaximumRetryCount = 8; RetryIntervalSec = 10 }
+          function Get-Asset([string]$Uri, [string]$OutFile) {
+            curl.exe -fL --retry 8 --retry-all-errors --retry-delay 5 -o $OutFile $Uri
+            if ($LASTEXITCODE -ne 0) { throw "Failed to download $Uri" }
+          }
           mkdir x-ui
           Copy-Item xui-release.exe x-ui\x-ui.exe
           mkdir x-ui\bin
@@ -310,16 +319,16 @@ jobs:
 
           # Download Xray for Windows
           $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/$env:XRAY_VERSION/"
-          Invoke-WebRequest @retry -Uri "${Xray_URL}Xray-windows-64.zip" -OutFile "Xray-windows-64.zip"
+          Get-Asset "${Xray_URL}Xray-windows-64.zip" "Xray-windows-64.zip"
           Expand-Archive -Path "Xray-windows-64.zip" -DestinationPath .
           Remove-Item "Xray-windows-64.zip"
           Remove-Item geoip.dat, geosite.dat -ErrorAction SilentlyContinue
-          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geoip.dat" -OutFile "geoip.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geosite.dat" -OutFile "geosite.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geoip.dat" -OutFile "geoip_IR.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geosite.dat" -OutFile "geosite_IR.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geoip.dat" -OutFile "geoip_RU.dat"
-          Invoke-WebRequest @retry -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geosite.dat" -OutFile "geosite_RU.dat"
+          Get-Asset "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geoip.dat" "geoip.dat"
+          Get-Asset "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/$env:GEODATA_VERSION/geosite.dat" "geosite.dat"
+          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geoip.dat" "geoip_IR.dat"
+          Get-Asset "https://github.com/chocolate4u/Iran-v2ray-rules/releases/download/$env:IRAN_GEODATA_VERSION/geosite.dat" "geosite_IR.dat"
+          Get-Asset "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geoip.dat" "geoip_RU.dat"
+          Get-Asset "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/download/$env:RUSSIA_GEODATA_VERSION/geosite.dat" "geosite_RU.dat"
           Rename-Item xray.exe xray-windows-amd64.exe
 
           # mtg-multi (MTProto sidecar) publishes a prebuilt Windows binary, so
