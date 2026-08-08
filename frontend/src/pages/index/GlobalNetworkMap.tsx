@@ -27,6 +27,13 @@ export const HONG_KONG_HUB = {
   longitude: 114.1694,
 } as const;
 
+export function globeTextureCoordinates(latitude: number, longitude: number) {
+  return {
+    u: (longitude + 180) / 360,
+    v: (latitude + 90) / 180,
+  };
+}
+
 function toGlobeNode(node: {
   id: number;
   name: string;

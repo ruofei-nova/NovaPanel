@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { globePosition, HONG_KONG_HUB } from '@/pages/index/GlobalNetworkMap';
+import {
+  globePosition,
+  globeTextureCoordinates,
+  HONG_KONG_HUB,
+} from '@/pages/index/GlobalNetworkMap';
 
 const radians = (degrees: number) => degrees * (Math.PI / 180);
 
@@ -37,5 +41,15 @@ describe('globePosition', () => {
     );
     expect(hongKong.y).toBeGreaterThan(0);
     expect(hongKong.z).toBeLessThan(0);
+  });
+
+  it('maps Hong Kong and Malaysia to their true equirectangular texture positions', () => {
+    const hongKong = globeTextureCoordinates(22.3193, 114.1694);
+    expect(hongKong.u).toBeCloseTo(0.817137, 6);
+    expect(hongKong.v).toBeCloseTo(0.6240, 4);
+
+    const malaysia = globeTextureCoordinates(2.8008619, 101.7094012);
+    expect(malaysia.u).toBeCloseTo(0.782526, 6);
+    expect(malaysia.v).toBeCloseTo(0.51556, 5);
   });
 });
