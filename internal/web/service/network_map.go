@@ -98,6 +98,32 @@ func ClearCustomerLocation(userID int) error {
 		Delete(&model.CustomerLocation{}).Error
 }
 
+// SaveCustomerIPLocation records a coarse city-level location from a
+// customer's login IP. It deliberately accepts only Chinese addresses: when a
+// customer reaches the landing server through an overseas relay, that relay
+// must never be mistaken for the customer's location. Browser-authorised GPS
+// remains stored separately and always takes precedence on the map.
+func SaveCustomerIPLocation(userID int, rawIP string) (*model.CustomerLocation, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid customer")
+	}
+	reader, err := networkGeoReader.get()
+	if err != nil {
+		return nil, err
+	}
+	lat, lon, ok := lookupChinaLocation(reader, rawIP)
+	if !ok {
+		return nil, nil
+	}
+	now := time.Now().Unix()
+	location := &model.CustomerLocation{UserID: userID}
+	err = database.GetDB().Where("user_id = ?", userID).
+		Assign(map[string]any{
+			"ip_latitude": lat, "ip_longitude": lon, "ip_updated_at": now,
+		}).FirstOrCreate(location).Error
+	return location, err
+}
+
 type geoCityRecord struct {
 	Country struct {
 		ISOCode string `maxminddb:"iso_code"`
@@ -109,9 +135,10 @@ type geoCityRecord struct {
 }
 
 type geoReaderCache struct {
-	mu     sync.Mutex
-	path   string
-	reader *maxminddb.Reader
+	mu      sync.Mutex
+	path    string
+	modTime time.Time
+	reader  *maxminddb.Reader
 }
 
 var networkGeoReader geoReaderCache
@@ -127,7 +154,11 @@ func (c *geoReaderCache) get() (*maxminddb.Reader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	path := geoDatabasePath()
-	if c.reader != nil && c.path == path {
+	info, statErr := os.Stat(path)
+	if statErr != nil {
+		return nil, statErr
+	}
+	if c.reader != nil && c.path == path && c.modTime.Equal(info.ModTime()) {
 		return c.reader, nil
 	}
 	reader, err := maxminddb.Open(path)
@@ -139,6 +170,7 @@ func (c *geoReaderCache) get() (*maxminddb.Reader, error) {
 	}
 	c.reader = reader
 	c.path = path
+	c.modTime = info.ModTime()
 	return reader, nil
 }
 
@@ -231,6 +263,36 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 		payload.Connections = append(payload.Connections, NetworkMapConnection{
 			NodeID: node.Id, Latitude: location.Latitude, Longitude: location.Longitude,
 			LastSeen: location.UpdatedAt, ActiveCount: 0, Source: "gps",
+		})
+	}
+	// A successful customer-panel login provides a consent-free, city-level
+	// fallback. It is used only while no fresh browser-authorised GPS position
+	// exists, and it is associated with every node owned by that customer.
+	var loginLocations []model.CustomerLocation
+	if len(ownerIDs) > 0 {
+		if err := db.Where("user_id IN ? AND ip_updated_at >= ?", ownerIDs,
+			payload.GeneratedAt-preciseLocationWindow).Find(&loginLocations).Error; err != nil {
+			return nil, err
+		}
+	}
+	loginByOwner := make(map[int]model.CustomerLocation, len(loginLocations))
+	for _, location := range loginLocations {
+		loginByOwner[location.UserID] = location
+	}
+	for _, node := range nodes {
+		if node.OwnerUserID == nil {
+			continue
+		}
+		if _, hasGPS := preciseLocations[*node.OwnerUserID]; hasGPS {
+			continue
+		}
+		location, ok := loginByOwner[*node.OwnerUserID]
+		if !ok || (location.IPLatitude == 0 && location.IPLongitude == 0) {
+			continue
+		}
+		payload.Connections = append(payload.Connections, NetworkMapConnection{
+			NodeID: node.Id, Latitude: location.IPLatitude, Longitude: location.IPLongitude,
+			LastSeen: location.IPUpdatedAt, ActiveCount: 0, Source: "login-ip",
 		})
 	}
 	if len(guidToNode) == 0 {

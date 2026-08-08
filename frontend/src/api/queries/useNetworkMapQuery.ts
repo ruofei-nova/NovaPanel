@@ -19,7 +19,7 @@ export interface NetworkMapConnection {
   longitude: number;
   lastSeen: number;
   activeCount: number;
-  source: 'gps' | 'ip';
+  source: 'gps' | 'ip' | 'login-ip';
 }
 
 export interface NetworkMapPayload {

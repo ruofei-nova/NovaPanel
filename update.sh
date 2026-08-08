@@ -9,6 +9,39 @@ plain='\033[0m'
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 
+setup_geoip_database() {
+    local updater="/usr/local/bin/novapanel-update-geoip"
+    local url="https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/deploy/install-geoip.sh"
+    echo -e "${green}Updating the NovaRuo city-location database...${plain}"
+    if ! ${curl_bin:-curl} --fail --location --silent --show-error "$url" -o "$updater"; then
+        echo -e "${yellow}GeoIP database update skipped; the existing database is preserved.${plain}"
+        return 0
+    fi
+    chmod 0755 "$updater"
+    "$updater" || return 0
+    if command -v systemctl > /dev/null 2>&1; then
+        cat > /etc/systemd/system/novapanel-geoip-update.service <<'EOF'
+[Unit]
+Description=Update NovaRuo IP city database
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/novapanel-update-geoip
+EOF
+        cat > /etc/systemd/system/novapanel-geoip-update.timer <<'EOF'
+[Unit]
+Description=Monthly NovaRuo IP city database update
+[Timer]
+OnCalendar=monthly
+Persistent=true
+RandomizedDelaySec=12h
+[Install]
+WantedBy=timers.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now novapanel-geoip-update.timer > /dev/null 2>&1 || true
+    fi
+}
+
 # Don't edit this config
 b_source="${BASH_SOURCE[0]}"
 while [ -h "$b_source" ]; do
@@ -1253,6 +1286,8 @@ update_x-ui() {
     # works out of the box on update too (no-op when XUI_ENABLE_FAIL2BAN=false).
     # Never fatal.
     setup_fail2ban
+
+    setup_geoip_database
 
     echo -e "${green}x-ui ${tag_version}${plain} updating finished, it is running now..."
     echo -e ""

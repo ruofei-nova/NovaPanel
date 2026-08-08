@@ -125,6 +125,12 @@ func (a *IndexController) login(c *gin.Context) {
 		logger.Warning("Unable to save session:", err)
 		return
 	}
+	if user.Role == panel.UserRoleCustomer {
+		if _, err := service.SaveCustomerIPLocation(user.Id, remoteIP); err != nil {
+			// Location enrichment must never turn a valid login into a failure.
+			logger.Warningf("unable to save customer login location: user=%d: %v", user.Id, err)
+		}
+	}
 
 	logger.Infof("%s logged in successfully", safeUser)
 	jsonMsg(c, I18nWeb(c, "pages.login.toasts.successLogin"), nil)

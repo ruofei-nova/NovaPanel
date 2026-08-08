@@ -24,6 +24,9 @@ func getRemoteIp(c *gin.Context) string {
 	}
 
 	if isTrustedProxy(remoteIP) {
+		if ip, ok := extractTrustedIP(c.GetHeader("CF-Connecting-IP")); ok {
+			return ip
+		}
 		if ip, ok := extractTrustedIP(c.GetHeader("X-Real-IP")); ok {
 			return ip
 		}

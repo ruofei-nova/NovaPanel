@@ -11,6 +11,39 @@ cur_dir=$(pwd)
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 
+setup_geoip_database() {
+    local updater="/usr/local/bin/novapanel-update-geoip"
+    local url="https://raw.githubusercontent.com/ruofei-nova/NovaPanel/main/deploy/install-geoip.sh"
+    echo -e "${green}Installing the NovaRuo city-location database...${plain}"
+    if ! curl --fail --location --silent --show-error "$url" -o "$updater"; then
+        echo -e "${yellow}GeoIP database download skipped; it can be retried later.${plain}"
+        return 0
+    fi
+    chmod 0755 "$updater"
+    "$updater" || return 0
+    if command -v systemctl > /dev/null 2>&1; then
+        cat > /etc/systemd/system/novapanel-geoip-update.service <<'EOF'
+[Unit]
+Description=Update NovaRuo IP city database
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/novapanel-update-geoip
+EOF
+        cat > /etc/systemd/system/novapanel-geoip-update.timer <<'EOF'
+[Unit]
+Description=Monthly NovaRuo IP city database update
+[Timer]
+OnCalendar=monthly
+Persistent=true
+RandomizedDelaySec=12h
+[Install]
+WantedBy=timers.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now novapanel-geoip-update.timer > /dev/null 2>&1 || true
+    fi
+}
+
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
 
@@ -1710,6 +1743,8 @@ install_x-ui() {
     # IP Limit relies on fail2ban; install + configure it now so the feature
     # works out of the box (no-op when XUI_ENABLE_FAIL2BAN=false). Never fatal.
     setup_fail2ban
+
+    setup_geoip_database
 
     echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
     echo -e ""
