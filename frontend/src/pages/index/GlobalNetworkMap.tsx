@@ -111,37 +111,76 @@ export default function GlobalNetworkMap() {
     globeGroup.rotation.z = -0.12;
     scene.add(globeGroup);
 
-    // A restrained deep-space backdrop keeps the dashboard cinematic without
-    // competing with node markers and routes. The seeded distribution avoids
-    // the star field jumping to a new layout after every page refresh.
-    const starCount = 520;
-    const starPositions = new Float32Array(starCount * 3);
+    // The reference look is a luminous data network attached to the planet,
+    // not a flat field of stars behind it. Keep the distribution deterministic.
     let starSeed = 0x6e6f7661;
     const seededRandom = () => {
       starSeed = (starSeed * 1664525 + 1013904223) >>> 0;
       return starSeed / 0x100000000;
     };
-    for (let index = 0; index < starCount; index += 1) {
-      const offset = index * 3;
-      starPositions[offset] = (seededRandom() - 0.5) * 15;
-      starPositions[offset + 1] = (seededRandom() - 0.5) * 9;
-      starPositions[offset + 2] = -1.5 - seededRandom() * 8;
-    }
-    const starGeometry = new THREE.BufferGeometry();
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMaterial = new THREE.PointsMaterial({
-      color: 0x9ffdf3,
-      size: 0.018,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: 0.48,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const stars = new THREE.Points(starGeometry, starMaterial);
-    scene.add(stars);
 
-    const texture = new THREE.TextureLoader().load(globeTexture);
+    const surfaceNetworkGroup = new THREE.Group();
+    globeGroup.add(surfaceNetworkGroup);
+
+    const texture = new THREE.TextureLoader().load(globeTexture, (loadedTexture) => {
+      const image = loadedTexture.image as CanvasImageSource & { width: number; height: number };
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const isLand = (latitude: number, longitude: number) => {
+        const x = Math.min(canvas.width - 1, Math.max(0, Math.floor(((longitude + 180) / 360) * canvas.width)));
+        const y = Math.min(canvas.height - 1, Math.max(0, Math.floor(((90 - latitude) / 180) * canvas.height)));
+        const offset = (y * canvas.width + x) * 4;
+        return pixels[offset + 1] > 28;
+      };
+
+      const landPoints: THREE.Vector3[] = [];
+      for (let attempt = 0; attempt < 12000 && landPoints.length < 1650; attempt += 1) {
+        const latitude = (seededRandom() - 0.5) * 164;
+        const longitude = (seededRandom() - 0.5) * 360;
+        if (!isLand(latitude, longitude)) continue;
+        landPoints.push(globePosition(latitude * Math.PI / 180, longitude * Math.PI / 180, 2.018));
+      }
+
+      const pointGeometry = new THREE.BufferGeometry().setFromPoints(landPoints);
+      const pointMaterial = new THREE.PointsMaterial({
+        color: 0x45f4d9,
+        size: 0.022,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.84,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      surfaceNetworkGroup.add(new THREE.Points(pointGeometry, pointMaterial));
+
+      const lineVertices: THREE.Vector3[] = [];
+      for (let index = 1; index < landPoints.length; index += 1) {
+        let nearest: THREE.Vector3 | null = null;
+        let nearestDistance = 0.24;
+        for (let candidate = Math.max(0, index - 42); candidate < index; candidate += 1) {
+          const distance = landPoints[index].distanceTo(landPoints[candidate]);
+          if (distance < nearestDistance) {
+            nearest = landPoints[candidate];
+            nearestDistance = distance;
+          }
+        }
+        if (nearest) lineVertices.push(landPoints[index], nearest);
+      }
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(lineVertices);
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x15bfae,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      surfaceNetworkGroup.add(new THREE.LineSegments(lineGeometry, lineMaterial));
+    });
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -150,8 +189,8 @@ export default function GlobalNetworkMap() {
     const material = new THREE.MeshStandardMaterial({
       map: texture,
       color: 0x82d8cc,
-      emissive: 0x021516,
-      emissiveIntensity: 0.32,
+      emissive: 0x032829,
+      emissiveIntensity: 0.58,
       metalness: 0.06,
       roughness: 0.82,
     });
@@ -163,7 +202,7 @@ export default function GlobalNetworkMap() {
     const atmosphereMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: new THREE.Color(0x48e8d8) },
-        intensity: { value: 0.82 },
+        intensity: { value: 0.38 },
       },
       vertexShader: `
         varying vec3 vNormal;
@@ -246,8 +285,6 @@ export default function GlobalNetworkMap() {
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
       globeGroup.rotation.y += delta * 0.18;
-      stars.rotation.y -= delta * 0.006;
-      starMaterial.opacity = 0.43 + Math.sin(timer.getElapsed() * 0.72) * 0.07;
       for (const child of networkGroup.children) {
         if (child.userData.pulse) {
           const scale = 0.84 + Math.sin(timer.getElapsed() * 3.2 + child.userData.phase) * 0.2;
@@ -266,12 +303,11 @@ export default function GlobalNetworkMap() {
       renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
       networkGroupRef.current = null;
       for (const child of networkGroup.children) disposeObject(child);
+      for (const child of surfaceNetworkGroup.children) disposeObject(child);
       geometry.dispose();
       material.dispose();
       atmosphereGeometry.dispose();
       atmosphereMaterial.dispose();
-      starGeometry.dispose();
-      starMaterial.dispose();
       texture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
