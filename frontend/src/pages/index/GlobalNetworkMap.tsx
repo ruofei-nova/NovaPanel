@@ -102,7 +102,7 @@ export default function GlobalNetworkMap() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.28;
+    renderer.toneMappingExposure = 1;
     renderer.setClearColor(0x000000, 0);
     mount.appendChild(renderer.domElement);
 
@@ -117,50 +117,11 @@ export default function GlobalNetworkMap() {
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshBasicMaterial({
       map: texture,
       color: 0xffffff,
-      emissive: 0x063b37,
-      emissiveIntensity: 0.34,
-      metalness: 0.06,
-      roughness: 0.82,
     });
     globeGroup.add(new THREE.Mesh(geometry, material));
-
-    // Back-face Fresnel shell: a soft atmosphere glow that follows the real
-    // sphere silhouette and therefore never changes map coordinates.
-    const atmosphereGeometry = new THREE.SphereGeometry(2.055, 96, 72);
-    const atmosphereMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        glowColor: { value: new THREE.Color(0x48e8d8) },
-        intensity: { value: 0.16 },
-      },
-      vertexShader: `
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-        void main() {
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          vNormal = normalize(normalMatrix * normal);
-          vViewPosition = -mvPosition.xyz;
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 glowColor;
-        uniform float intensity;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-        void main() {
-          float fresnel = pow(1.0 - max(0.0, dot(normalize(vNormal), normalize(vViewPosition))), 3.15);
-          gl_FragColor = vec4(glowColor, fresnel * intensity);
-        }
-      `,
-      side: THREE.BackSide,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    globeGroup.add(new THREE.Mesh(atmosphereGeometry, atmosphereMaterial));
 
     const networkGroup = new THREE.Group();
     globeGroup.add(networkGroup);
@@ -236,8 +197,6 @@ export default function GlobalNetworkMap() {
       for (const child of networkGroup.children) disposeObject(child);
       geometry.dispose();
       material.dispose();
-      atmosphereGeometry.dispose();
-      atmosphereMaterial.dispose();
       texture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
