@@ -134,7 +134,7 @@ export default function GlobalNetworkMap() {
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
     const oceanMaterial = new THREE.MeshStandardMaterial({
-      color: 0x04171b,
+      color: 0x01090a,
       metalness: 0,
       roughness: 1,
     });
