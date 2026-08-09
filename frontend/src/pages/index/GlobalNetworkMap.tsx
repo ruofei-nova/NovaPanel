@@ -21,6 +21,8 @@ interface GlobeTooltip {
   y: number;
 }
 
+export type NetworkMapView = 'admin' | 'customer';
+
 export const HONG_KONG_HUB = {
   name: '香港网络中心',
   latitude: 22.3193,
@@ -74,7 +76,11 @@ function disposeObject(child: THREE.Object3D) {
   else material.dispose();
 }
 
-export default function GlobalNetworkMap() {
+export function shouldRenderHubRoutes(view: NetworkMapView) {
+  return view === 'admin';
+}
+
+export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMapView }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const networkGroupRef = useRef<THREE.Group | null>(null);
   const [tooltip, setTooltip] = useState<GlobeTooltip | null>(null);
@@ -134,9 +140,9 @@ export default function GlobalNetworkMap() {
       color: 0x000000,
       emissive: 0x8ffff2,
       emissiveMap: texture,
-      emissiveIntensity: 0.64,
+      emissiveIntensity: 1.28,
       transparent: true,
-      alphaTest: 0.012,
+      alphaTest: 0.004,
       metalness: 0,
       roughness: 1,
     });
@@ -274,23 +280,25 @@ export default function GlobalNetworkMap() {
     };
     group.add(hubMarker);
 
-    for (const node of globeNodes.slice(0, 48)) {
-      const target = globePosition(node.latitude, node.longitude);
-      if (hubPosition.distanceTo(target) < 0.02) continue;
-      const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
-      const distance = hubPosition.distanceTo(target);
-      midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
-      const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
-      const hubLine = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
-        new THREE.MeshBasicMaterial({
-          color: 0x7ef5e3,
-          transparent: true,
-          opacity: node.status === 'offline' ? 0.18 : 0.46,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      group.add(hubLine);
+    if (shouldRenderHubRoutes(view)) {
+      for (const node of globeNodes.slice(0, 48)) {
+        const target = globePosition(node.latitude, node.longitude);
+        if (hubPosition.distanceTo(target) < 0.02) continue;
+        const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
+        const distance = hubPosition.distanceTo(target);
+        midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
+        const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
+        const hubLine = new THREE.Mesh(
+          new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
+          new THREE.MeshBasicMaterial({
+            color: 0x7ef5e3,
+            transparent: true,
+            opacity: node.status === 'offline' ? 0.18 : 0.46,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        group.add(hubLine);
+      }
     }
 
     for (const [index, connection] of data.connections.slice(0, 80).entries()) {
@@ -300,6 +308,22 @@ export default function GlobalNetworkMap() {
         connection.latitude * (Math.PI / 180),
         connection.longitude * (Math.PI / 180),
       );
+      const target = globePosition(node.latitude, node.longitude);
+      const midpoint = source.clone().add(target).multiplyScalar(0.5);
+      const distance = source.distanceTo(target);
+      midpoint.normalize().multiplyScalar(2.15 + Math.min(0.9, distance * 0.24));
+      const curve = new THREE.QuadraticBezierCurve3(source, midpoint, target);
+      const line = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 36, 0.009, 6, false),
+        new THREE.MeshBasicMaterial({
+          color: connection.source === 'gps' ? 0x8cfff0 : 0x53ead7,
+          transparent: true,
+          opacity: connection.source === 'gps' ? 0.72 : 0.48,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      group.add(line);
+
       const sourceMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.min(connection.activeCount, 8) * 0.003, 10, 10),
         new THREE.MeshBasicMaterial({
@@ -318,7 +342,7 @@ export default function GlobalNetworkMap() {
       };
       group.add(sourceMarker);
     }
-  }, [data.connections, globeNodes, nodeByID]);
+  }, [data.connections, globeNodes, nodeByID, view]);
 
   return (
     <Card className="network-map-card globe-card" title="全球网络状态">

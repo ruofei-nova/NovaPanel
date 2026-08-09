@@ -114,7 +114,7 @@ export default function CustomerDashboard() {
                 </Space>
               </Card>
             </div>
-            <GlobalNetworkMap />
+            <GlobalNetworkMap view="customer" />
           </Layout.Content>
         </Layout>
       </Layout>

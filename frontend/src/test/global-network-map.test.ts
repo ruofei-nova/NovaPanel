@@ -4,6 +4,7 @@ import {
   globePosition,
   globeTextureCoordinates,
   HONG_KONG_HUB,
+  shouldRenderHubRoutes,
   uniqueNodesById,
 } from '@/pages/index/GlobalNetworkMap';
 
@@ -65,5 +66,12 @@ describe('uniqueNodesById', () => {
       { id: 7, name: 'Los Angeles duplicate' },
       { id: 9, name: 'Malaysia' },
     ]);
+  });
+});
+
+describe('network map route visibility', () => {
+  it('shows hub routes only to administrators', () => {
+    expect(shouldRenderHubRoutes('admin')).toBe(true);
+    expect(shouldRenderHubRoutes('customer')).toBe(false);
   });
 });
