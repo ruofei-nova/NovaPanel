@@ -133,9 +133,13 @@ export default function GlobalNetworkMap() {
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const oceanMaterial = new THREE.MeshBasicMaterial({
-      color: 0x000304,
-      toneMapped: false,
+    const oceanMaterial = new THREE.MeshStandardMaterial({
+      color: 0x001014,
+      emissive: 0x000304,
+      emissiveIntensity: 0.28,
+      metalness: 0,
+      roughness: 0.96,
+      dithering: true,
     });
     globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
 
