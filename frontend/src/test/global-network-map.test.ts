@@ -4,6 +4,7 @@ import {
   globePosition,
   globeTextureCoordinates,
   HONG_KONG_HUB,
+  uniqueNodesById,
 } from '@/pages/index/GlobalNetworkMap';
 
 const radians = (degrees: number) => degrees * (Math.PI / 180);
@@ -51,5 +52,18 @@ describe('globePosition', () => {
     const malaysia = globeTextureCoordinates(2.8008619, 101.7094012);
     expect(malaysia.u).toBeCloseTo(0.782526, 6);
     expect(malaysia.v).toBeCloseTo(0.51556, 5);
+  });
+});
+
+describe('uniqueNodesById', () => {
+  it('keeps one rendered route per bound VPS even when payload rows repeat', () => {
+    expect(uniqueNodesById([
+      { id: 7, name: 'Los Angeles' },
+      { id: 7, name: 'Los Angeles duplicate' },
+      { id: 9, name: 'Malaysia' },
+    ])).toEqual([
+      { id: 7, name: 'Los Angeles duplicate' },
+      { id: 9, name: 'Malaysia' },
+    ]);
   });
 });

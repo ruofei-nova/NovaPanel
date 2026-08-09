@@ -53,6 +53,10 @@ function toGlobeNode(node: {
   };
 }
 
+export function uniqueNodesById<T extends { id: number }>(nodes: T[]) {
+  return [...new Map(nodes.map((node) => [node.id, node])).values()];
+}
+
 export function globePosition(latitude: number, longitude: number, radius = 2.025) {
   const latitudeScale = Math.cos(latitude);
   return new THREE.Vector3(
@@ -76,9 +80,9 @@ export default function GlobalNetworkMap() {
   const [tooltip, setTooltip] = useState<GlobeTooltip | null>(null);
   const { data } = useNetworkMapQuery();
   const globeNodes = useMemo(
-    () => data.nodes
+    () => uniqueNodesById(data.nodes
       .filter((node) => node.latitude !== 0 || node.longitude !== 0)
-      .map(toGlobeNode),
+      .map(toGlobeNode)),
     [data.nodes],
   );
   const nodeByID = useMemo(
@@ -117,16 +121,27 @@ export default function GlobalNetworkMap() {
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      color: 0x000000,
-      emissive: 0x8ffff2,
-      emissiveMap: texture,
-      emissiveIntensity: 0.58,
+    const oceanMaterial = new THREE.MeshStandardMaterial({
+      color: 0x0b2b31,
       metalness: 0,
       roughness: 1,
     });
-    globeGroup.add(new THREE.Mesh(geometry, material));
+    globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
+
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      alphaMap: texture,
+      color: 0x000000,
+      emissive: 0x8ffff2,
+      emissiveMap: texture,
+      emissiveIntensity: 0.64,
+      transparent: true,
+      alphaTest: 0.012,
+      metalness: 0,
+      roughness: 1,
+    });
+    const surfaceGeometry = new THREE.SphereGeometry(2.004, 128, 96);
+    globeGroup.add(new THREE.Mesh(surfaceGeometry, material));
 
     const networkGroup = new THREE.Group();
     globeGroup.add(networkGroup);
@@ -201,6 +216,8 @@ export default function GlobalNetworkMap() {
       networkGroupRef.current = null;
       for (const child of networkGroup.children) disposeObject(child);
       geometry.dispose();
+      surfaceGeometry.dispose();
+      oceanMaterial.dispose();
       material.dispose();
       texture.dispose();
       renderer.dispose();
@@ -283,22 +300,6 @@ export default function GlobalNetworkMap() {
         connection.latitude * (Math.PI / 180),
         connection.longitude * (Math.PI / 180),
       );
-      const target = globePosition(node.latitude, node.longitude);
-      const midpoint = source.clone().add(target).multiplyScalar(0.5);
-      const distance = source.distanceTo(target);
-      midpoint.normalize().multiplyScalar(2.15 + Math.min(0.9, distance * 0.24));
-      const curve = new THREE.QuadraticBezierCurve3(source, midpoint, target);
-      const line = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, 36, 0.009, 6, false),
-        new THREE.MeshBasicMaterial({
-          color: connection.source === 'gps' ? 0x8cfff0 : 0x53ead7,
-          transparent: true,
-          opacity: connection.source === 'gps' ? 0.72 : 0.48,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      group.add(line);
-
       const sourceMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.min(connection.activeCount, 8) * 0.003, 10, 10),
         new THREE.MeshBasicMaterial({
