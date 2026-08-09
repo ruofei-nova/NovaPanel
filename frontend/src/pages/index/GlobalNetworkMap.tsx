@@ -139,8 +139,20 @@ export default function GlobalNetworkMap() {
       emissiveIntensity: 0.36,
       metalness: 0,
       roughness: 0.96,
+      transparent: true,
       dithering: true,
     });
+    oceanMaterial.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <opaque_fragment>',
+        `
+          float oceanFacing = abs(dot(normalize(normal), normalize(vViewPosition)));
+          diffuseColor.a *= smoothstep(0.025, 0.18, oceanFacing);
+          #include <opaque_fragment>
+        `,
+      );
+    };
+    oceanMaterial.customProgramCacheKey = () => 'nova-ocean-edge-fade-v1';
     globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
 
     const material = new THREE.MeshBasicMaterial({
