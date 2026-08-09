@@ -119,13 +119,10 @@ export default function GlobalNetworkMap() {
     const geometry = new THREE.SphereGeometry(2, 128, 96);
     const material = new THREE.MeshStandardMaterial({
       map: texture,
-      alphaMap: texture,
       color: 0x000000,
       emissive: 0x8ffff2,
       emissiveMap: texture,
       emissiveIntensity: 0.58,
-      transparent: true,
-      alphaTest: 0.018,
       metalness: 0,
       roughness: 1,
     });
