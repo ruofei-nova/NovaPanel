@@ -132,40 +132,18 @@ export default function GlobalNetworkMap() {
     texture.wrapS = THREE.RepeatWrapping;
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
+    // Keep the globe as one textured surface. A separate ocean sphere creates a
+    // visible silhouette where the two radii diverge while the globe rotates.
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const oceanMaterial = new THREE.MeshStandardMaterial({
-      color: 0x000a0c,
-      emissive: 0x00080a,
-      emissiveIntensity: 0.36,
-      metalness: 0,
-      roughness: 0.96,
-      transparent: true,
-      dithering: true,
-    });
-    oceanMaterial.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <opaque_fragment>',
-        `
-          float oceanFacing = abs(dot(normalize(normal), normalize(vViewPosition)));
-          diffuseColor.a *= smoothstep(0.025, 0.18, oceanFacing);
-          #include <opaque_fragment>
-        `,
-      );
-    };
-    oceanMaterial.customProgramCacheKey = () => 'nova-ocean-edge-fade-v1';
-    globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
-
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshStandardMaterial({
       map: texture,
-      color: 0xa8fff7,
-      transparent: true,
-      opacity: 0.98,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
+      color: 0x82d8cc,
+      emissive: 0x021516,
+      emissiveIntensity: 0.32,
+      metalness: 0.06,
+      roughness: 0.82,
     });
-    const surfaceGeometry = new THREE.SphereGeometry(2.012, 128, 96);
-    globeGroup.add(new THREE.Mesh(surfaceGeometry, material));
+    globeGroup.add(new THREE.Mesh(geometry, material));
 
     const networkGroup = new THREE.Group();
     globeGroup.add(networkGroup);
@@ -240,8 +218,6 @@ export default function GlobalNetworkMap() {
       networkGroupRef.current = null;
       for (const child of networkGroup.children) disposeObject(child);
       geometry.dispose();
-      surfaceGeometry.dispose();
-      oceanMaterial.dispose();
       material.dispose();
       texture.dispose();
       renderer.dispose();
