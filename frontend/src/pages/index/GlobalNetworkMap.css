@@ -21,7 +21,7 @@
   min-height: 380px;
   overflow: hidden;
   border-radius: 10px;
-  background: #09181e;
+  background: transparent;
 }
 
 .globe-webgl {
