@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assignRouteLanes,
   globePosition,
   globeTextureCoordinates,
   HONG_KONG_HUB,
@@ -52,6 +53,18 @@ describe('globePosition', () => {
     const malaysia = globeTextureCoordinates(2.8008619, 101.7094012);
     expect(malaysia.u).toBeCloseTo(0.782526, 6);
     expect(malaysia.v).toBeCloseTo(0.51556, 5);
+  });
+});
+
+describe('assignRouteLanes', () => {
+  it('separates routes whose VPS coordinates overlap', () => {
+    const routes = assignRouteLanes([
+      { id: 1, latitude: 0.594325, longitude: -2.06385 },
+      { id: 2, latitude: 0.594326, longitude: -2.063851 },
+      { id: 3, latitude: 0.048884, longitude: 1.775165 },
+    ]);
+
+    expect(routes.map(({ lane }) => lane)).toEqual([0, 1, 0]);
   });
 });
 

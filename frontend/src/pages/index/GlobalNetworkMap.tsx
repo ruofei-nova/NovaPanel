@@ -57,6 +57,18 @@ export function uniqueNodesById<T extends { id: number }>(nodes: T[]) {
   return [...new Map(nodes.map((node) => [node.id, node])).values()];
 }
 
+export function assignRouteLanes<T extends { latitude: number; longitude: number }>(nodes: T[]) {
+  const counts = new Map<string, number>();
+  return nodes.map((node) => {
+    const key = `${node.latitude.toFixed(3)}:${node.longitude.toFixed(3)}`;
+    const occurrence = counts.get(key) ?? 0;
+    counts.set(key, occurrence + 1);
+    const magnitude = Math.ceil(occurrence / 2);
+    const lane = occurrence === 0 ? 0 : occurrence % 2 === 1 ? magnitude : -magnitude;
+    return { node, lane };
+  });
+}
+
 export function globePosition(latitude: number, longitude: number, radius = 2.025) {
   const latitudeScale = Math.cos(latitude);
   return new THREE.Vector3(
@@ -271,12 +283,18 @@ export default function GlobalNetworkMap() {
     };
     group.add(hubMarker);
 
-    for (const node of globeNodes.slice(0, 48)) {
+    for (const { node, lane } of assignRouteLanes(globeNodes.slice(0, 48))) {
       const target = globePosition(node.latitude, node.longitude);
       if (hubPosition.distanceTo(target) < 0.02) continue;
       const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
       const distance = hubPosition.distanceTo(target);
-      midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
+      midpoint.normalize().multiplyScalar(
+        2.18 + Math.min(1.05, distance * 0.26) + Math.abs(lane) * 0.12,
+      );
+      if (lane !== 0) {
+        const tangent = new THREE.Vector3().crossVectors(hubPosition, target).normalize();
+        midpoint.addScaledVector(tangent, lane * 0.15);
+      }
       const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
       const hubLine = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
@@ -290,7 +308,7 @@ export default function GlobalNetworkMap() {
       group.add(hubLine);
     }
 
-    for (const [index, connection] of data.connections.slice(0, 80).entries()) {
+    for (const [index, connection] of data.connections.slice(0, 0).entries()) {
       const node = nodeByID.get(connection.nodeId);
       if (!node) continue;
       const source = globePosition(

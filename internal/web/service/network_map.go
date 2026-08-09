@@ -203,7 +203,9 @@ type connectionBucket struct {
 
 func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 	db := database.GetDB()
-	query := db.Model(&model.Node{}).Where("enable = ?", true).Order("id asc")
+	query := db.Model(&model.Node{}).
+		Where("enable = ? AND owner_user_id IS NOT NULL", true).
+		Order("id asc")
 	if ownerUserID != nil {
 		query = query.Where("owner_user_id = ?", *ownerUserID)
 	}
