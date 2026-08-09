@@ -133,10 +133,9 @@ export default function GlobalNetworkMap() {
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
     const geometry = new THREE.SphereGeometry(2, 128, 96);
-    const oceanMaterial = new THREE.MeshStandardMaterial({
-      color: 0x01090a,
-      metalness: 0,
-      roughness: 1,
+    const oceanMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000304,
+      toneMapped: false,
     });
     globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
 
@@ -149,7 +148,7 @@ export default function GlobalNetworkMap() {
       depthWrite: false,
       toneMapped: false,
     });
-    const surfaceGeometry = new THREE.SphereGeometry(2.004, 128, 96);
+    const surfaceGeometry = new THREE.SphereGeometry(2.012, 128, 96);
     globeGroup.add(new THREE.Mesh(surfaceGeometry, material));
 
     const networkGroup = new THREE.Group();
