@@ -21,8 +21,6 @@ interface GlobeTooltip {
   y: number;
 }
 
-export type NetworkMapView = 'admin' | 'customer';
-
 export const HONG_KONG_HUB = {
   name: '香港网络中心',
   latitude: 22.3193,
@@ -76,11 +74,7 @@ function disposeObject(child: THREE.Object3D) {
   else material.dispose();
 }
 
-export function shouldRenderHubRoutes(view: NetworkMapView) {
-  return view === 'admin';
-}
-
-export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMapView }) {
+export default function GlobalNetworkMap() {
   const mountRef = useRef<HTMLDivElement>(null);
   const networkGroupRef = useRef<THREE.Group | null>(null);
   const [tooltip, setTooltip] = useState<GlobeTooltip | null>(null);
@@ -134,17 +128,14 @@ export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMap
     });
     globeGroup.add(new THREE.Mesh(geometry, oceanMaterial));
 
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshBasicMaterial({
       map: texture,
-      alphaMap: texture,
-      color: 0x000000,
-      emissive: 0x8ffff2,
-      emissiveMap: texture,
-      emissiveIntensity: 1.28,
+      color: 0xa8fff7,
       transparent: true,
-      alphaTest: 0.004,
-      metalness: 0,
-      roughness: 1,
+      opacity: 0.98,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
     });
     const surfaceGeometry = new THREE.SphereGeometry(2.004, 128, 96);
     globeGroup.add(new THREE.Mesh(surfaceGeometry, material));
@@ -280,25 +271,23 @@ export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMap
     };
     group.add(hubMarker);
 
-    if (shouldRenderHubRoutes(view)) {
-      for (const node of globeNodes.slice(0, 48)) {
-        const target = globePosition(node.latitude, node.longitude);
-        if (hubPosition.distanceTo(target) < 0.02) continue;
-        const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
-        const distance = hubPosition.distanceTo(target);
-        midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
-        const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
-        const hubLine = new THREE.Mesh(
-          new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
-          new THREE.MeshBasicMaterial({
-            color: 0x7ef5e3,
-            transparent: true,
-            opacity: node.status === 'offline' ? 0.18 : 0.46,
-            blending: THREE.AdditiveBlending,
-          }),
-        );
-        group.add(hubLine);
-      }
+    for (const node of globeNodes.slice(0, 48)) {
+      const target = globePosition(node.latitude, node.longitude);
+      if (hubPosition.distanceTo(target) < 0.02) continue;
+      const midpoint = hubPosition.clone().add(target).multiplyScalar(0.5);
+      const distance = hubPosition.distanceTo(target);
+      midpoint.normalize().multiplyScalar(2.18 + Math.min(1.05, distance * 0.26));
+      const curve = new THREE.QuadraticBezierCurve3(hubPosition, midpoint, target);
+      const hubLine = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 40, 0.008, 6, false),
+        new THREE.MeshBasicMaterial({
+          color: 0x7ef5e3,
+          transparent: true,
+          opacity: node.status === 'offline' ? 0.18 : 0.46,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      group.add(hubLine);
     }
 
     for (const [index, connection] of data.connections.slice(0, 80).entries()) {
@@ -308,22 +297,6 @@ export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMap
         connection.latitude * (Math.PI / 180),
         connection.longitude * (Math.PI / 180),
       );
-      const target = globePosition(node.latitude, node.longitude);
-      const midpoint = source.clone().add(target).multiplyScalar(0.5);
-      const distance = source.distanceTo(target);
-      midpoint.normalize().multiplyScalar(2.15 + Math.min(0.9, distance * 0.24));
-      const curve = new THREE.QuadraticBezierCurve3(source, midpoint, target);
-      const line = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, 36, 0.009, 6, false),
-        new THREE.MeshBasicMaterial({
-          color: connection.source === 'gps' ? 0x8cfff0 : 0x53ead7,
-          transparent: true,
-          opacity: connection.source === 'gps' ? 0.72 : 0.48,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      group.add(line);
-
       const sourceMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.min(connection.activeCount, 8) * 0.003, 10, 10),
         new THREE.MeshBasicMaterial({
@@ -342,7 +315,7 @@ export default function GlobalNetworkMap({ view = 'admin' }: { view?: NetworkMap
       };
       group.add(sourceMarker);
     }
-  }, [data.connections, globeNodes, nodeByID, view]);
+  }, [data.connections, globeNodes, nodeByID]);
 
   return (
     <Card className="network-map-card globe-card" title="全球网络状态">
