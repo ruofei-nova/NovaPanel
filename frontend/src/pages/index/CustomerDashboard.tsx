@@ -3,7 +3,7 @@ import { EnvironmentOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Button, Card, ConfigProvider, Layout, Space, Statistic, Tag } from 'antd';
 
 import { useAccount } from '@/api/account';
-import { useNetworkMapQuery } from '@/api/queries/useNetworkMapQuery';
+import { totalNodeOnlineCount, useNetworkMapQuery } from '@/api/queries/useNetworkMapQuery';
 import { useTheme } from '@/hooks/useTheme';
 import AppSidebar from '@/layouts/AppSidebar';
 import { HttpUtil } from '@/utils';
@@ -63,7 +63,7 @@ export default function CustomerDashboard() {
   }, [requestPreciseLocation]);
 
   const online = data.nodes.filter((node) => node.status === 'online').length;
-  const active = data.connections.reduce((sum, item) => sum + item.activeCount, 0);
+  const active = totalNodeOnlineCount(data.nodes);
   const gpsEnabled = locationState === 'granted' || data.gpsReady;
   const locationLabel = gpsEnabled
     ? 'GPS 精准定位已启用'

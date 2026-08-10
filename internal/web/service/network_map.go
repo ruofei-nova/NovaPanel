@@ -26,6 +26,7 @@ type NetworkMapNode struct {
 	Name        string  `json:"name"`
 	Status      string  `json:"status"`
 	LatencyMs   int     `json:"latencyMs"`
+	OnlineCount int     `json:"onlineCount"`
 	Latitude    float64 `json:"latitude"`
 	Longitude   float64 `json:"longitude"`
 	OwnerUserID *int    `json:"ownerUserId,omitempty"`
@@ -219,6 +220,13 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 		Nodes:       make([]NetworkMapNode, 0, len(nodes)),
 		Connections: []NetworkMapConnection{},
 	}
+	onlineByGuid := (&NodeService{}).onlineEmailsByGuid()
+	selfGuid, _ := (&SettingService{}).GetPanelGuid()
+	var identityNodes []*model.Node
+	if err := db.Model(&model.Node{}).Select("id", "guid").Find(&identityNodes).Error; err != nil {
+		return nil, err
+	}
+	ambiguousGuids := ambiguousNodeGuids(identityNodes, selfGuid)
 	guidToNode := make(map[string]int, len(nodes))
 	nodeOwners := make(map[int]int, len(nodes))
 	ownerIDs := make([]int, 0, len(nodes))
@@ -227,8 +235,10 @@ func GetNetworkMap(ownerUserID *int) (*NetworkMapPayload, error) {
 		attributionKey := effectiveNodeKey(node)
 		payload.Nodes = append(payload.Nodes, NetworkMapNode{
 			ID: node.Id, Guid: attributionKey, Name: node.Name, Status: node.Status,
-			LatencyMs: node.LatencyMs, Latitude: node.Latitude,
-			Longitude: node.Longitude, OwnerUserID: node.OwnerUserID,
+			LatencyMs:   node.LatencyMs,
+			OnlineCount: len(onlineByGuid[effectiveNodeGuid(node, ambiguousGuids)]),
+			Latitude:    node.Latitude,
+			Longitude:   node.Longitude, OwnerUserID: node.OwnerUserID,
 		})
 		if attributionKey != "" {
 			guidToNode[attributionKey] = node.Id

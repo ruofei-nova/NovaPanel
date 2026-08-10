@@ -8,6 +8,7 @@ export interface NetworkMapNode {
   name: string;
   status: string;
   latencyMs: number;
+  onlineCount: number;
   latitude: number;
   longitude: number;
   ownerUserId?: number;
@@ -37,6 +38,10 @@ const emptyPayload: NetworkMapPayload = {
   nodes: [],
   connections: [],
 };
+
+export function totalNodeOnlineCount(nodes: Pick<NetworkMapNode, 'onlineCount'>[]) {
+  return nodes.reduce((sum, node) => sum + (node.onlineCount || 0), 0);
+}
 
 export function useNetworkMapQuery() {
   const [data, setData] = useState<NetworkMapPayload>(emptyPayload);
